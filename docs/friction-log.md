@@ -48,3 +48,17 @@ Honest notes on problems hit while building Glean, and how each was fixed.
 - **Cause:** GitHub created an initial commit (LICENSE, README) when the repo was made, and I had also created empty LICENSE and README locally.
 - **Fix:** `git pull --allow-unrelated-histories`, kept GitHub's versions of both files, then pushed.
 - **Time lost:** ~10 min
+
+### 8. kiro-cli not recognized right after install
+- **Tool:** Kiro CLI (v2.27.1)
+- **What happened:** `kiro-cli login` returned "not recognized as an internal or external command".
+- **Cause:** The terminal was opened before the install finished, so PATH wasn't updated.
+- **Fix:** Re-ran the PowerShell installer, then opened a new Command Prompt.
+- **Time lost:** ~10 min
+
+### 9. kirocrew command not on PATH after desktop install
+- **Tool:** Kiro Crew (Windows desktop installer)
+- **What happened:** `kirocrew token` returned "not recognized", and `where kirocrew` found nothing.
+- **Cause:** The installer keeps the CLI inside its app folder and doesn't add it to PATH.
+- **Fix:** Found `kirocrew.cmd` under `%LOCALAPPDATA%\Programs\KiroCrew\...\bin` and ran it with the full path.
+- **Time lost:** ~10 min
