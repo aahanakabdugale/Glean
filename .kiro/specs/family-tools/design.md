@@ -153,3 +153,93 @@ except Exception as exc:
 | `GLEAN_DB_PATH` | `glean.db` | Path to the SQLite file |
 | `GLEAN_HOST` | `127.0.0.1` | Bind address for uvicorn |
 | `GLEAN_PORT` | `8000` | Port for uvicorn |
+
+---
+
+## New Table — tasks
+
+```sql
+CREATE TABLE IF NOT EXISTS tasks (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    title     TEXT    NOT NULL,
+    due_date  TEXT    NOT NULL,   -- ISO 8601, e.g. 2030-06-15
+    member_id INTEGER REFERENCES family_members(id),  -- nullable
+    done      INTEGER NOT NULL DEFAULT 0              -- 0 = pending, 1 = done
+);
+```
+
+`member_id` is nullable — a task does not have to belong to a specific person.
+`done` uses integer 0/1 (SQLite has no boolean type).
+
+---
+
+## New Tool Contracts
+
+### `get_expiring_documents(days: int) → str`
+
+```
+Validation:
+  1. days < 1  → "Please give a number of days (at least 1)."
+
+Query:
+  today     = datetime.date.today()
+  cutoff    = today + datetime.timedelta(days=days)
+
+  SELECT d.doc_type, fm.name, d.expiry_date
+  FROM   documents d
+  JOIN   family_members fm ON fm.id = d.member_id
+  WHERE  d.expiry_date BETWEEN date(today) AND date(cutoff)
+  ORDER  BY d.expiry_date
+
+Empty  → f"No documents expiring in the next {days} day(s)."
+Rows   → one line per document:
+         "<doc_type> — <name>, expires <expiry_date>"
+         joined with "\n"
+
+Note: do NOT call conn.close().
+```
+
+### `add_task(title: str, due_date: str, member_id: int | None = None) → str`
+
+```
+Validation (in order):
+  1. title.strip() == ""                    → "Please provide a task title."
+  2. datetime.date.fromisoformat(due_date)
+     raises ValueError                      → "That date doesn't look right. Please use YYYY-MM-DD format."
+     (past dates are accepted)
+  3. member_id is not None
+     AND SELECT id FROM family_members WHERE id = member_id → no row
+                                            → "I don't know that family member. Check the id and try again."
+
+Happy path:
+  INSERT INTO tasks (title, due_date, member_id, done) VALUES (?, ?, ?, 0)
+  return f"Task added: {title.strip()}, due {due_date}."
+
+Note: do NOT call conn.close().
+```
+
+### `list_upcoming_tasks(days: int) → str`
+
+```
+Validation:
+  1. days < 1  → "Please give a number of days (at least 1)."
+
+Query:
+  today   = datetime.date.today()
+  cutoff  = today + datetime.timedelta(days=days)
+
+  SELECT t.title, t.due_date, fm.name
+  FROM   tasks t
+  LEFT JOIN family_members fm ON fm.id = t.member_id
+  WHERE  t.done = 0
+  AND    t.due_date BETWEEN date(today) AND date(cutoff)
+  ORDER  BY t.due_date
+
+Empty  → f"No tasks due in the next {days} day(s)."
+Rows   → one line per task:
+         "<title> — due <due_date>"           (no member linked)
+         "<title> — due <due_date> (<name>)"  (member linked)
+         joined with "\n"
+
+Note: do NOT call conn.close().
+```

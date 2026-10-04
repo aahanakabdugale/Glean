@@ -1,7 +1,7 @@
 # Requirements — Family Tools
 
 ## Overview
-Three MCP tools for a family paperwork tracker backed by SQLite. Responses must be
+Six MCP tools for a family paperwork tracker backed by SQLite. Responses must be
 short and plain enough to be read aloud by a voice assistant. Errors must be
 friendly — no stack traces, no technical jargon.
 
@@ -43,6 +43,39 @@ friendly — no stack traces, no technical jargon.
   unique personal identifier.** Only `doc_type`, `member_id`, and `expiry_date`
   are recorded.
 
+### FR-4 · get_expiring_documents
+- Accepts: `days` (integer — look-ahead window).
+- Returns all documents whose `expiry_date` falls within the next `days` days from
+  today (inclusive of today, inclusive of the end date).
+- Each result line: `<doc_type> — <member name>, expires <expiry_date>`.
+- If nothing expires in that window, returns *"No documents expiring in the next
+  <days> day(s)."*
+- Validation:
+  - `days` must be ≥ 1 → *"Please give a number of days (at least 1)."*
+
+### FR-5 · add_task
+- Accepts: `title` (string), `due_date` (string, ISO 8601 `YYYY-MM-DD`),
+  `member_id` (integer, optional — links the task to a specific family member).
+- Adds a row to the `tasks` table with `done = 0`.
+- Returns a short confirmation, e.g. *"Task added: Renew passport, due 2030-06-15."*
+- Validation rules:
+  - `title` stripped and non-empty → *"Please provide a task title."*
+  - `due_date` must be a valid `YYYY-MM-DD` date (past dates are allowed) →
+    *"That date doesn't look right. Please use YYYY-MM-DD format."*
+  - If `member_id` is provided it must match an existing `family_members.id` →
+    *"I don't know that family member. Check the id and try again."*
+
+### FR-6 · list_upcoming_tasks
+- Accepts: `days` (integer — look-ahead window).
+- Returns all tasks where `done = 0` and `due_date` falls within the next `days`
+  days from today (inclusive on both ends).
+- Each result line: `<title> — due <due_date>` (append ` (<member name>)` when a
+  member is linked).
+- If nothing is due in that window, returns *"No tasks due in the next <days>
+  day(s)."*
+- Validation:
+  - `days` must be ≥ 1 → *"Please give a number of days (at least 1)."*
+
 ---
 
 ## Non-Functional Requirements
@@ -61,6 +94,7 @@ friendly — no stack traces, no technical jargon.
 
 ## Out of Scope (this iteration)
 - Editing or deleting records.
-- Document reminders / expiry notifications.
+- Marking tasks as done.
+- Document reminders / expiry notifications sent proactively.
 - Authentication or multi-user access control.
 - Any UI beyond the MCP tools themselves.

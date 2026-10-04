@@ -150,3 +150,96 @@ Tests to write:
   - The `GLEAN_DB_PATH` env var and the `127.0.0.1` default host.
   - The no-ID-numbers rule (one sentence).
 - **Done when:** `pytest` exits green and `README.md` has the four points above.
+
+
+---
+
+## T-11 · Database layer — tasks table
+**File:** `glean/db.py`
+
+- Add the `tasks` table to the `SCHEMA` string in `init_db`:
+  ```sql
+  CREATE TABLE IF NOT EXISTS tasks (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      title     TEXT    NOT NULL,
+      due_date  TEXT    NOT NULL,
+      member_id INTEGER REFERENCES family_members(id),
+      done      INTEGER NOT NULL DEFAULT 0
+  );
+  ```
+- `member_id` is nullable; `done` defaults to 0.
+- **Done when:** `python -c "from glean.db import get_connection, init_db; c=get_connection(':memory:'); init_db(c); print([r[1] for r in c.execute(\"SELECT * FROM sqlite_master WHERE type='table'\").fetchall()])"` prints a list that includes `tasks`.
+
+---
+
+## T-12 · Tool — `get_expiring_documents`
+**File:** `glean/tools.py`
+
+- Implement `get_expiring_documents(days: int)` as an `@mcp.tool` function.
+- Validate `days ≥ 1`; return *"Please give a number of days (at least 1)."* if not.
+- Query `documents JOIN family_members` where `expiry_date BETWEEN today AND today+days`.
+- Format each row as `"<doc_type> — <name>, expires <expiry_date>"`.
+- Return lines joined by `\n`, or the empty-window message.
+- Do not call `conn.close()`.
+- **Done when:** T-13 tests for this tool all pass.
+
+---
+
+## T-13 · Tests — get_expiring_documents
+**File:** `tests/test_tools.py`
+
+Reuse the `db_conn` fixture. Import `get_expiring_documents`.
+
+Tests to write:
+- `test_expiring_none_in_window` — no documents → returns the "No documents" message.
+- `test_expiring_document_in_window` — add a member and document expiring in 5 days,
+  call with `days=7`; result contains the doc type and member name.
+- `test_expiring_document_outside_window` — document expiring in 30 days, call with
+  `days=7`; result is the "No documents" message.
+- `test_expiring_today_included` — document expiring today (today's ISO date), call
+  with `days=1`; result includes it.
+- `test_expiring_invalid_days` — `days=0` returns the friendly error.
+
+- **Done when:** `pytest tests/test_tools.py -k "expiring"` passes.
+
+---
+
+## T-14 · Tools — `add_task` and `list_upcoming_tasks`
+**File:** `glean/tools.py`
+
+- Implement `add_task(title, due_date, member_id=None)` as an `@mcp.tool` function.
+  - Validate: non-empty title, valid ISO date, `member_id` exists if provided.
+  - Insert with `done=0`; return short confirmation.
+  - Do not call `conn.close()`.
+- Implement `list_upcoming_tasks(days)` as an `@mcp.tool` function.
+  - Validate `days ≥ 1`.
+  - `LEFT JOIN family_members` so unlinked tasks still appear.
+  - Format: `"<title> — due <due_date>"` or `"<title> — due <due_date> (<name>)"`.
+  - Do not call `conn.close()`.
+- **Done when:** T-15 tests for both tools pass.
+
+---
+
+## T-15 · Tests — add_task and list_upcoming_tasks
+**File:** `tests/test_tools.py`
+
+Reuse the `db_conn` fixture. Import `add_task`, `list_upcoming_tasks`.
+
+Tests to write:
+- `test_add_task_happy_path` — return string contains the title and due date.
+- `test_add_task_empty_title` — blank title returns friendly error.
+- `test_add_task_bad_date` — malformed date returns the YYYY-MM-DD error.
+- `test_add_task_past_date_allowed` — a past due date is accepted.
+- `test_add_task_with_member` — add a member, then add a task with that member's id;
+  returns confirmation without error.
+- `test_add_task_unknown_member_id` — nonexistent `member_id` returns friendly error.
+- `test_list_tasks_none_in_window` — no tasks → returns "No tasks" message.
+- `test_list_tasks_in_window` — task due in 3 days, call with `days=7`; result
+  contains the title.
+- `test_list_tasks_outside_window` — task due in 14 days, call with `days=7`;
+  result is the "No tasks" message.
+- `test_list_tasks_with_member_name` — linked task shows member name in parentheses.
+- `test_list_tasks_without_member` — unlinked task shows no parentheses.
+- `test_list_tasks_invalid_days` — `days=0` returns the friendly error.
+
+- **Done when:** `pytest tests/test_tools.py -k "task"` passes.
