@@ -34,3 +34,17 @@ Honest notes on problems hit while building Glean, and how each was fixed.
 - **What happened:** It opens a server list with sample servers instead of the old connect form. The "Add server" form defaults to stdio, which would launch a new process instead of connecting to my running server.
 - **Fix:** Chose Streamable HTTP and the URL `http://localhost:8000/mcp`.
 - **Time lost:** ~10 min
+
+### 6. .gitignore didn't work, .venv got staged
+- **Tool:** Git / Windows shell
+- **What happened:** `git add .` started adding thousands of files from `.venv`, with LF/CRLF warnings.
+- **Cause:** `.gitignore` was written by a shell `echo` and wasn't read correctly (likely encoding).
+- **Fix:** `git reset`, rewrote `.gitignore` from cmd, verified with `git check-ignore -v .venv`.
+- **Time lost:** ~10 min
+
+### 7. First push rejected (remote had commits)
+- **Tool:** Git / GitHub
+- **What happened:** `git push` was rejected with "fetch first".
+- **Cause:** GitHub created an initial commit (LICENSE, README) when the repo was made, and I had also created empty LICENSE and README locally.
+- **Fix:** `git pull --allow-unrelated-histories`, kept GitHub's versions of both files, then pushed.
+- **Time lost:** ~10 min
