@@ -17,6 +17,14 @@ CREATE TABLE IF NOT EXISTS documents (
     expiry_date TEXT    NOT NULL
     -- Never store ID numbers, passport numbers, or similar identifiers.
 );
+
+CREATE TABLE IF NOT EXISTS tasks (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    title     TEXT    NOT NULL,
+    due_date  TEXT    NOT NULL,
+    member_id INTEGER REFERENCES family_members(id),
+    done      INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
