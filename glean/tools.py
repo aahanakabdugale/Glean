@@ -134,3 +134,82 @@ def get_expiring_documents(days: int = 30) -> str:
         lines.append(f"{r['name']}'s {r['doc_type']} - {r['expiry_date']} ({status})")
 
     return "\n".join(lines)
+
+@mcp.tool()
+def add_task(title: str, due_date: str, owner: str = "") -> str:
+    """Add a task or deadline, e.g. 'Renew passport'. due_date must be YYYY-MM-DD.
+    owner is optional: the name of the family member the task is for. Leave it empty for a general task."""
+    title = title.strip()
+    owner = owner.strip()
+
+    if not title:
+        return "Please tell me what the task is."
+
+    try:
+        due = datetime.datetime.strptime(due_date.strip(), "%Y-%m-%d").date()
+    except ValueError:
+        return "That date doesn't look right. Please use YYYY-MM-DD format."
+
+    try:
+        conn = db.get_connection()
+        member_id = None
+        if owner:
+            member = conn.execute(
+                "SELECT id FROM family_members WHERE name = ?", (owner,)
+            ).fetchone()
+            if member is None:
+                return f"I don't know anyone called {owner}. Add them first."
+            member_id = member["id"]
+
+        conn.execute(
+            "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
+            (title, due.isoformat(), member_id),
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.error("add_task failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    return f"Task added: {title}, due {due.isoformat()}."
+
+
+@mcp.tool()
+def list_upcoming_tasks(days: int = 30) -> str:
+    """List tasks that are not done and are due within the next N days (default 30),
+    soonest first. Overdue tasks are included. Use when the user asks what is coming up or what is pending."""
+    if not 0 <= days <= 3650:
+        return "Please give a number of days between 0 and 3650."
+
+    today = datetime.date.today()
+    cutoff = today + datetime.timedelta(days=days)
+
+    try:
+        conn = db.get_connection()
+        rows = conn.execute(
+            "SELECT t.title, t.due_date, m.name "
+            "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+            "WHERE t.done = 0 AND t.due_date <= ? "
+            "ORDER BY t.due_date",
+            (cutoff.isoformat(),),
+        ).fetchall()
+    except Exception as exc:
+        logger.error("list_upcoming_tasks failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    if not rows:
+        return f"No tasks due in the next {days} days."
+
+    lines = []
+    for r in rows:
+        due = datetime.date.fromisoformat(r["due_date"])
+        left = (due - today).days
+        if left < 0:
+            status = f"OVERDUE by {-left} days"
+        elif left == 0:
+            status = "due today"
+        else:
+            status = f"{left} days left"
+        who = f" ({r['name']})" if r["name"] else ""
+        lines.append(f"{r['title']}{who} - {r['due_date']} ({status})")
+
+    return "\n".join(lines)

@@ -199,25 +199,22 @@ Rows   → one line per document:
 Note: do NOT call conn.close().
 ```
 
-### `add_task(title: str, due_date: str, member_id: int | None = None) → str`
+### `add_task(title: str, due_date: str, owner: str = "") → str`
 
-```
 Validation (in order):
-  1. title.strip() == ""                    → "Please provide a task title."
-  2. datetime.date.fromisoformat(due_date)
+  1. title.strip() == ""                    → "Please tell me what the task is."
+  2. datetime.strptime(due_date, "%Y-%m-%d")
      raises ValueError                      → "That date doesn't look right. Please use YYYY-MM-DD format."
      (past dates are accepted)
-  3. member_id is not None
-     AND SELECT id FROM family_members WHERE id = member_id → no row
-                                            → "I don't know that family member. Check the id and try again."
+  3. owner.strip() is not empty
+     AND no family member with that name    → "I don't know anyone called {owner}. Add them first."
 
 Happy path:
   INSERT INTO tasks (title, due_date, member_id, done) VALUES (?, ?, ?, 0)
-  return f"Task added: {title.strip()}, due {due_date}."
+  (member_id is NULL when owner is empty)
+  return f"Task added: {title}, due {YYYY-MM-DD}."
 
 Note: do NOT call conn.close().
-```
-
 ### `list_upcoming_tasks(days: int) → str`
 
 ```
