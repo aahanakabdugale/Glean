@@ -358,3 +358,207 @@ def test_expiring_invalid_days_over_limit(db_conn):
     """days=3651 returns the exact validation error."""
     result = get_expiring_documents(3651)
     assert result == "Please give a number of days between 0 and 3650."
+
+
+# ---------------------------------------------------------------------------
+# add_task and list_upcoming_tasks — T-15
+#
+# NOTE — spec/code mismatch:
+#   T-14 spec says add_task(title, due_date, member_id=None) taking an integer.
+#   The actual code has add_task(title, due_date, owner="") taking a member NAME.
+#   Tests follow the code (owner = name string).
+#
+#   T-14 spec says list_upcoming_tasks validates days >= 1.
+#   The actual code validates 0 <= days <= 3650 (same guard as get_expiring_documents).
+#   Tests follow the code.
+# ---------------------------------------------------------------------------
+
+from glean.tools import add_task, list_upcoming_tasks
+
+
+def _task_count(conn):
+    return conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+
+
+def _get_task(conn, title):
+    return conn.execute("SELECT * FROM tasks WHERE title = ?", (title,)).fetchone()
+
+
+# ---------------------------------------------------------------------------
+# add_task — success cases
+# ---------------------------------------------------------------------------
+
+
+def test_add_task_happy_path_no_owner(db_conn):
+    """Success with no owner returns the exact confirmation; row has NULL member_id and done=0."""
+    due = (_dt.date.today() + _dt.timedelta(days=7)).isoformat()
+    result = add_task("Renew insurance", due)
+    assert result == f"Task added: Renew insurance, due {due}."
+
+    row = _get_task(db_conn, "Renew insurance")
+    assert row is not None
+    assert row["due_date"] == due
+    assert row["member_id"] is None
+    assert row["done"] == 0
+
+
+def test_add_task_happy_path_with_owner(db_conn):
+    """Success with a valid owner returns the exact confirmation; row has correct member_id and done=0."""
+    add_family_member("Maria", "daughter", 2005, "student")
+    due = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    result = add_task("Buy textbooks", due, "Maria")
+    assert result == f"Task added: Buy textbooks, due {due}."
+
+    member = db_conn.execute(
+        "SELECT id FROM family_members WHERE name = 'Maria'"
+    ).fetchone()
+    row = _get_task(db_conn, "Buy textbooks")
+    assert row is not None
+    assert row["due_date"] == due
+    assert row["member_id"] == member["id"]
+    assert row["done"] == 0
+
+
+def test_add_task_past_date_accepted(db_conn):
+    """A task with a past due date is accepted; row is saved."""
+    due = (_dt.date.today() - _dt.timedelta(days=10)).isoformat()
+    result = add_task("Old errand", due)
+    assert result == f"Task added: Old errand, due {due}."
+
+    row = _get_task(db_conn, "Old errand")
+    assert row is not None
+    assert row["due_date"] == due
+
+
+# ---------------------------------------------------------------------------
+# add_task — failure cases
+# ---------------------------------------------------------------------------
+
+
+def test_add_task_empty_title(db_conn):
+    """Blank title returns the exact validation message; no row is saved."""
+    due = (_dt.date.today() + _dt.timedelta(days=7)).isoformat()
+    result = add_task("   ", due)
+    assert result == "Please tell me what the task is."
+    assert _task_count(db_conn) == 0
+
+
+def test_add_task_bad_date_format(db_conn):
+    """A date in wrong format returns the exact format-error message; no row is saved."""
+    result = add_task("Fix leak", "25-12-2025")
+    assert result == "That date doesn't look right. Please use YYYY-MM-DD format."
+    assert _task_count(db_conn) == 0
+
+
+def test_add_task_bad_date_nonsense(db_conn):
+    """A completely invalid date string returns the exact format-error message; no row is saved."""
+    result = add_task("Fix leak", "not-a-date")
+    assert result == "That date doesn't look right. Please use YYYY-MM-DD format."
+    assert _task_count(db_conn) == 0
+
+
+def test_add_task_unknown_owner(db_conn):
+    """Unknown owner name returns the exact 'add them first' message; no row is saved."""
+    due = (_dt.date.today() + _dt.timedelta(days=7)).isoformat()
+    result = add_task("Buy books", due, "Nobody")
+    assert result == "I don't know anyone called Nobody. Add them first."
+    assert _task_count(db_conn) == 0
+
+
+# ---------------------------------------------------------------------------
+# list_upcoming_tasks — success cases
+# ---------------------------------------------------------------------------
+
+
+def test_list_tasks_no_tasks(db_conn):
+    """Empty tasks table returns the exact 'no tasks' message."""
+    result = list_upcoming_tasks(7)
+    assert result == "No tasks due in the next 7 days."
+
+
+def test_list_tasks_one_in_window(db_conn):
+    """A task due in 3 days appears with the exact output line (status = '3 days left')."""
+    due = (_dt.date.today() + _dt.timedelta(days=3)).isoformat()
+    add_task("Call dentist", due)
+    result = list_upcoming_tasks(7)
+    assert result == f"Call dentist - {due} (3 days left)"
+
+
+def test_list_tasks_overdue(db_conn):
+    """A task overdue by 2 days shows 'OVERDUE by 2 days' in the exact line."""
+    due = (_dt.date.today() - _dt.timedelta(days=2)).isoformat()
+    add_task("Pay bill", due)
+    result = list_upcoming_tasks(0)
+    assert result == f"Pay bill - {due} (OVERDUE by 2 days)"
+
+
+def test_list_tasks_due_today(db_conn):
+    """A task due today shows 'due today' in the exact line."""
+    due = _dt.date.today().isoformat()
+    add_task("Submit form", due)
+    result = list_upcoming_tasks(0)
+    assert result == f"Submit form - {due} (due today)"
+
+
+def test_list_tasks_sorted_soonest_first(db_conn):
+    """Two tasks with different due dates appear soonest-first."""
+    sooner = (_dt.date.today() + _dt.timedelta(days=2)).isoformat()
+    later = (_dt.date.today() + _dt.timedelta(days=8)).isoformat()
+    add_task("Early task", sooner)
+    add_task("Late task", later)
+    result = list_upcoming_tasks(30)
+    lines = result.splitlines()
+    assert lines[0] == f"Early task - {sooner} (2 days left)"
+    assert lines[1] == f"Late task - {later} (8 days left)"
+
+
+def test_list_tasks_with_owner_name(db_conn):
+    """A task linked to a member shows the member name in parentheses after the title."""
+    add_family_member("Maria", "daughter", 2005, "student")
+    due = (_dt.date.today() + _dt.timedelta(days=4)).isoformat()
+    add_task("School fees", due, "Maria")
+    result = list_upcoming_tasks(7)
+    assert result == f"School fees (Maria) - {due} (4 days left)"
+
+
+def test_list_tasks_without_owner(db_conn):
+    """A task with no owner shows no parenthesised name."""
+    due = (_dt.date.today() + _dt.timedelta(days=4)).isoformat()
+    add_task("General errand", due)
+    result = list_upcoming_tasks(7)
+    assert result == f"General errand - {due} (4 days left)"
+
+
+def test_list_tasks_done_excluded(db_conn):
+    """A task with done=1 does not appear in the output."""
+    due = (_dt.date.today() + _dt.timedelta(days=2)).isoformat()
+    add_task("Done task", due)
+    db_conn.execute("UPDATE tasks SET done = 1 WHERE title = 'Done task'")
+    db_conn.commit()
+    result = list_upcoming_tasks(7)
+    assert result == "No tasks due in the next 7 days."
+
+
+def test_list_tasks_beyond_window_excluded(db_conn):
+    """A task due in 14 days does not appear when asking for a 7-day window."""
+    far = (_dt.date.today() + _dt.timedelta(days=14)).isoformat()
+    add_task("Far future task", far)
+    result = list_upcoming_tasks(7)
+    assert result == "No tasks due in the next 7 days."
+
+
+# ---------------------------------------------------------------------------
+# list_upcoming_tasks — invalid days
+# ---------------------------------------------------------------------------
+
+
+def test_list_tasks_invalid_days_negative(db_conn):
+    """A negative days value returns the exact validation error."""
+    result = list_upcoming_tasks(-1)
+    assert result == "Please give a number of days between 0 and 3650."
+
+
+def test_list_tasks_invalid_days_over_limit(db_conn):
+    """days=3651 returns the exact validation error."""
+    result = list_upcoming_tasks(3651)
+    assert result == "Please give a number of days between 0 and 3650."
