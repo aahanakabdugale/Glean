@@ -1,17 +1,24 @@
 """
-Tests for add_family_member, list_family_members, and add_document.
+Tests for add_family_member, list_family_members, add_document,
+and get_expiring_documents.
 
 The db_conn fixture creates an in-memory SQLite database, runs init_db on it,
 and monkeypatches glean.db.get_connection so every tool call uses it.
 The production glean.db file is never touched.
 """
 
+import datetime as _dt
 import sqlite3
 
 import pytest
 
 import glean.db as glean_db
-from glean.tools import add_document, add_family_member, list_family_members
+from glean.tools import (
+    add_document,
+    add_family_member,
+    get_expiring_documents,
+    list_family_members,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -37,14 +44,48 @@ def db_conn(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _member_count(conn):
+    return conn.execute("SELECT COUNT(*) FROM family_members").fetchone()[0]
+
+
+def _document_count(conn):
+    return conn.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
+
+
+def _get_member(conn, name):
+    return conn.execute(
+        "SELECT * FROM family_members WHERE name = ?", (name,)
+    ).fetchone()
+
+
+def _get_document(conn, owner_name, doc_type):
+    return conn.execute(
+        "SELECT d.* FROM documents d "
+        "JOIN family_members m ON m.id = d.member_id "
+        "WHERE m.name = ? AND d.doc_type = ?",
+        (owner_name, doc_type),
+    ).fetchone()
+
+
+# ---------------------------------------------------------------------------
 # add_family_member — happy path
 # ---------------------------------------------------------------------------
 
 
 def test_add_member_happy_path(db_conn):
+    """Success returns the exact confirmation string and saves the row."""
     result = add_family_member("Maria", "daughter", 2005, "student")
-    assert "Maria" in result
-    assert "daughter" in result
+    assert result == "Added Maria (daughter)."
+
+    row = _get_member(db_conn, "Maria")
+    assert row is not None
+    assert row["relation"] == "daughter"
+    assert row["birth_year"] == 2005
+    assert row["status"] == "student"
 
 
 # ---------------------------------------------------------------------------
@@ -53,29 +94,31 @@ def test_add_member_happy_path(db_conn):
 
 
 def test_add_member_empty_name(db_conn):
+    """Blank name returns the exact validation message; no row is saved."""
     result = add_family_member("   ", "daughter", 2005, "student")
-    # Should be a friendly error, not a confirmation
-    assert "Maria" not in result
-    assert len(result) > 0  # some message returned
-    # Must not start with "Added"
-    assert not result.startswith("Added")
+    assert result == "Please provide a name."
+    assert _member_count(db_conn) == 0
 
 
 def test_add_member_empty_relation(db_conn):
+    """Blank relation returns the exact validation message; no row is saved."""
     result = add_family_member("Maria", "  ", 2005, "student")
-    assert not result.startswith("Added")
-    assert len(result) > 0
+    assert result == "Please tell me how they are related to you."
+    assert _member_count(db_conn) == 0
 
 
 def test_add_member_bad_birth_year_too_old(db_conn):
+    """A birth year before 1900 returns the exact validation message; no row is saved."""
     result = add_family_member("Maria", "daughter", 1800, "student")
-    assert not result.startswith("Added")
-    assert "birth year" in result.lower() or "year" in result.lower()
+    assert result == "That birth year doesn't look right."
+    assert _member_count(db_conn) == 0
 
 
 def test_add_member_bad_birth_year_future(db_conn):
+    """A birth year far in the future returns the exact validation message; no row is saved."""
     result = add_family_member("Maria", "daughter", 9999, "student")
-    assert not result.startswith("Added")
+    assert result == "That birth year doesn't look right."
+    assert _member_count(db_conn) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -84,16 +127,20 @@ def test_add_member_bad_birth_year_future(db_conn):
 
 
 def test_add_member_duplicate_exact(db_conn):
+    """Exact-match duplicate returns the collision message; only one row exists."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_family_member("Maria", "sister", 2007, "student")
-    # Second attempt must NOT succeed
-    assert not result.startswith("Added")
+    assert result == "I already have someone called Maria."
+    assert _member_count(db_conn) == 1
 
 
 def test_add_member_duplicate_case_insensitive(db_conn):
+    """Case-variant duplicate returns the collision message; only one row exists."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_family_member("maria", "sister", 2007, "student")
-    assert not result.startswith("Added")
+    # The tool raises IntegrityError (UNIQUE constraint); message uses the passed name
+    assert result == "I already have someone called maria."
+    assert _member_count(db_conn) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -102,33 +149,33 @@ def test_add_member_duplicate_case_insensitive(db_conn):
 
 
 def test_list_members_empty(db_conn):
+    """Empty table returns the exact 'no members' message."""
     result = list_family_members()
-    assert "No family members" in result
+    assert result == "No family members added yet."
 
 
 def test_list_members_one(db_conn):
+    """A single member is listed with the exact line format."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = list_family_members()
-    assert "Maria" in result
-    assert "daughter" in result
-    assert "2005" in result
+    assert result == "Maria (daughter) — born 2005, student"
 
 
 def test_list_members_multiple(db_conn):
+    """Multiple members appear, one per line, sorted by name."""
     add_family_member("Maria", "daughter", 2005, "student")
     add_family_member("John", "son", 2003, "engineer")
     result = list_family_members()
-    assert "Maria" in result
-    assert "John" in result
+    lines = result.splitlines()
+    assert lines[0] == "John (son) — born 2003, engineer"
+    assert lines[1] == "Maria (daughter) — born 2005, student"
 
 
 def test_list_members_format(db_conn):
-    """Each line should follow '<name> (<relation>) — born <year>, <status>' format."""
+    """Each line follows '<name> (<relation>) — born <year>, <status>' exactly."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = list_family_members()
-    assert "Maria (daughter)" in result
-    assert "born 2005" in result
-    assert "student" in result
+    assert result == "Maria (daughter) — born 2005, student"
 
 
 # ---------------------------------------------------------------------------
@@ -137,18 +184,25 @@ def test_list_members_format(db_conn):
 
 
 def test_add_document_happy_path(db_conn):
+    """Success returns the exact confirmation string and saves the row with correct values."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_document("passport", "Maria", "2030-06-15")
-    assert "Maria" in result
-    assert "2030-06-15" in result
-    assert "Passport" in result  # title-cased
+    assert result == "Passport added for Maria, expires 2030-06-15."
+
+    row = _get_document(db_conn, "Maria", "passport")
+    assert row is not None
+    assert row["expiry_date"] == "2030-06-15"
 
 
 def test_add_document_uses_stored_capitalisation(db_conn):
-    """Reply should use the stored name capitalisation, not whatever the caller passed."""
+    """Reply uses the stored member name, and doc_type is title-cased."""
     add_family_member("Maria", "daughter", 2005, "student")
-    result = add_document("passport", "Maria", "2030-06-15")
-    assert "Maria" in result
+    result = add_document("driving licence", "Maria", "2028-03-10")
+    assert result == "Driving Licence added for Maria, expires 2028-03-10."
+
+    row = _get_document(db_conn, "Maria", "driving licence")
+    assert row is not None
+    assert row["expiry_date"] == "2028-03-10"
 
 
 # ---------------------------------------------------------------------------
@@ -157,29 +211,34 @@ def test_add_document_uses_stored_capitalisation(db_conn):
 
 
 def test_add_document_empty_doc_type(db_conn):
+    """Blank doc_type returns the exact validation message; no document row is saved."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_document("  ", "Maria", "2030-06-15")
-    assert not result.startswith("Passport")
-    assert not result.lower().startswith("added")
-    assert len(result) > 0
+    assert result == "Please tell me which document it is."
+    assert _document_count(db_conn) == 0
 
 
 def test_add_document_unknown_owner(db_conn):
+    """Unknown owner returns the exact 'add them first' message; no document row is saved."""
     result = add_document("passport", "Nobody", "2030-06-15")
-    assert "Nobody" in result
-    assert "don't know" in result.lower() or "add them" in result.lower()
+    assert result == "I don't know anyone called Nobody. Add them first."
+    assert _document_count(db_conn) == 0
 
 
 def test_add_document_bad_date_format(db_conn):
+    """A date in the wrong format returns the exact format-error message; no row is saved."""
     add_family_member("Maria", "daughter", 2005, "student")
-    result = add_document("passport", "Maria", "15-06-2030")  # wrong format
-    assert "YYYY-MM-DD" in result or "date" in result.lower()
+    result = add_document("passport", "Maria", "15-06-2030")
+    assert result == "That date doesn't look right. Please use YYYY-MM-DD format."
+    assert _document_count(db_conn) == 0
 
 
 def test_add_document_bad_date_nonsense(db_conn):
+    """A completely invalid date string returns the exact format-error message; no row is saved."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_document("passport", "Maria", "not-a-date")
-    assert "YYYY-MM-DD" in result or "date" in result.lower()
+    assert result == "That date doesn't look right. Please use YYYY-MM-DD format."
+    assert _document_count(db_conn) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -188,12 +247,14 @@ def test_add_document_bad_date_nonsense(db_conn):
 
 
 def test_add_document_past_expiry_date_accepted(db_conn):
-    """A document that has already expired should still be recorded."""
+    """A document that has already expired is still recorded; row is saved."""
     add_family_member("Maria", "daughter", 2005, "student")
     result = add_document("old id card", "Maria", "2000-01-01")
-    # Should succeed, not return an error about the date
-    assert "2000-01-01" in result
-    assert "YYYY-MM-DD" not in result
+    assert result == "Old Id Card added for Maria, expires 2000-01-01."
+
+    row = _get_document(db_conn, "Maria", "old id card")
+    assert row is not None
+    assert row["expiry_date"] == "2000-01-01"
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +263,7 @@ def test_add_document_past_expiry_date_accepted(db_conn):
 
 
 def test_documents_stores_member_id(db_conn):
-    """documents.member_id should be an integer matching the member's row id."""
+    """documents.member_id is an integer matching the member's row id."""
     add_family_member("Maria", "daughter", 2005, "student")
     add_document("passport", "Maria", "2030-06-15")
 
@@ -222,7 +283,7 @@ def test_documents_stores_member_id(db_conn):
 def test_no_id_number_columns_in_documents(db_conn):
     """
     PRAGMA table_info(documents) must not list any column whose name suggests
-    a personal identifier (id_number, passport_number, national, etc.).
+    a personal identifier (id_number, passport_number, national, ssn, aadhar).
     """
     forbidden_substrings = ("id_number", "passport_number", "national", "ssn", "aadhar")
     cols = db_conn.execute("PRAGMA table_info(documents)").fetchall()
@@ -232,3 +293,68 @@ def test_no_id_number_columns_in_documents(db_conn):
             assert bad not in col, (
                 f"Column '{col}' in documents table looks like a personal identifier"
             )
+
+
+# ---------------------------------------------------------------------------
+# get_expiring_documents — T-13
+# ---------------------------------------------------------------------------
+
+
+def test_expiring_none_in_window(db_conn):
+    """No documents at all → returns the exact 'nothing expiring' message."""
+    result = get_expiring_documents(7)
+    assert result == "Nothing is expiring in the next 7 days."
+
+
+def test_expiring_document_in_window(db_conn):
+    """A document expiring in 5 days appears with the correct status text for days=7."""
+    add_family_member("Maria", "daughter", 2005, "student")
+    expiry = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    add_document("passport", "Maria", expiry)
+    result = get_expiring_documents(7)
+    # 5 days left is > 7 threshold only if <=7 → URGENT; 5 <= 7 so status is URGENT
+    assert result == f"Maria's passport - {expiry} (URGENT, 5 days left)"
+
+
+def test_expiring_document_already_expired(db_conn):
+    """A document expired 3 days ago shows the EXPIRED status with exact day count."""
+    add_family_member("Maria", "daughter", 2005, "student")
+    expiry = (_dt.date.today() - _dt.timedelta(days=3)).isoformat()
+    add_document("driving licence", "Maria", expiry)
+    result = get_expiring_documents(0)
+    assert result == f"Maria's driving licence - {expiry} (EXPIRED 3 days ago)"
+
+
+def test_expiring_document_more_than_7_days(db_conn):
+    """A document expiring in 10 days shows the plain 'N days left' status (not URGENT)."""
+    add_family_member("John", "son", 2000, "engineer")
+    expiry = (_dt.date.today() + _dt.timedelta(days=10)).isoformat()
+    add_document("passport", "John", expiry)
+    result = get_expiring_documents(30)
+    assert result == f"John's passport - {expiry} (10 days left)"
+
+
+def test_expiring_sorted_soonest_first(db_conn):
+    """Two documents expiring at different times appear soonest-first."""
+    add_family_member("Maria", "daughter", 2005, "student")
+    add_family_member("John", "son", 2000, "engineer")
+    sooner = (_dt.date.today() + _dt.timedelta(days=3)).isoformat()
+    later = (_dt.date.today() + _dt.timedelta(days=10)).isoformat()
+    add_document("passport", "Maria", sooner)
+    add_document("driving licence", "John", later)
+    result = get_expiring_documents(30)
+    lines = result.splitlines()
+    assert lines[0] == f"Maria's passport - {sooner} (URGENT, 3 days left)"
+    assert lines[1] == f"John's driving licence - {later} (10 days left)"
+
+
+def test_expiring_invalid_days_negative(db_conn):
+    """A negative days value returns the exact validation error; no DB query needed."""
+    result = get_expiring_documents(-1)
+    assert result == "Please give a number of days between 0 and 3650."
+
+
+def test_expiring_invalid_days_over_limit(db_conn):
+    """days=3651 returns the exact validation error."""
+    result = get_expiring_documents(3651)
+    assert result == "Please give a number of days between 0 and 3650."
