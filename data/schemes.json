@@ -1,0 +1,46 @@
+[
+  {
+    "id": "ignoaps_mh",
+    "name": "Indira Gandhi National Old Age Pension Scheme (Maharashtra)",
+    "state": "Maharashtra",
+    "summary": "Monthly pension for older people from BPL families.",
+    "rules": { "min_age": 65, "requires": ["bpl"] },
+    "documents": ["Age proof", "BPL proof", "Bank account details"],
+    "notes": "Apply at the Collector Office, Tahsildar or Talathi. The source page does not list documents, so confirm the list at the Tahsildar office.",
+    "source_url": "https://nashik.gov.in/en/scheme/indira-gandhi-national-old-age-pension-scheme/",
+    "apply_url": "https://sjsa.maharashtra.gov.in/mr/scheme-category/special-assistance"
+  },
+  {
+    "id": "ayushman_vay_vandana",
+    "name": "Ayushman Vay Vandana Card (AB PM-JAY)",
+    "state": "All India",
+    "summary": "Health cover for every senior citizen aged 70 and above, whatever their income.",
+    "rules": { "min_age": 70 },
+    "documents": ["Aadhaar card (age is checked from Aadhaar)", "Mobile number for Aadhaar e-KYC"],
+    "notes": "Age is the only condition. People already on CGHS, ECHS or Ayushman CAPF must choose one scheme.",
+    "source_url": "https://rsdebate.nic.in/bitstream/123456789/758871/1/PQ_267_11022025_U903_p367_p370.pdf",
+    "apply_url": "https://beneficiary.nha.gov.in"
+  },
+  {
+    "id": "apy",
+    "name": "Atal Pension Yojana",
+    "state": "All India",
+    "summary": "Guaranteed monthly pension of Rs 1,000 to 5,000 after age 60.",
+    "rules": { "min_age": 18, "max_age": 40, "excludes": ["income_tax_payer"] },
+    "documents": ["Savings bank or post office account", "Mobile number", "Aadhaar (desirable, not mandatory)", "Nominee details"],
+    "notes": "Anyone who is or has been an income-tax payer cannot join (since 1 Oct 2022).",
+    "source_url": "https://pfrda.org.in/web/pfrda/w/faqs/atal-pension-yojana",
+    "apply_url": "https://enps.nsdl.com/eNPS/ApySubRegistration.html"
+  },
+  {
+    "id": "scss",
+    "name": "Senior Citizens Savings Scheme",
+    "state": "All India",
+    "summary": "Government-backed savings deposit for senior citizens, at post offices and banks.",
+    "rules": { "min_age": 60 },
+    "documents": ["Age proof", "Identity and address proof (PAN, passport, voter ID etc.)", "Passport-size photos"],
+    "notes": "Ages 55 to 59 qualify only if retired on superannuation or VRS. Retired defence personnel qualify from age 50.",
+    "source_url": "https://sbi.bank.in/web/personal-banking/investments-deposits/govt-schemes/senior-citizens-savings-scheme",
+    "apply_url": "https://www.indiapost.gov.in"
+  }
+]
