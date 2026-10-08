@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alexa+ Family Admin | Glean Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #080c14;
+      --card-bg: rgba(15, 23, 42, 0.75);
+      --card-border: rgba(56, 189, 248, 0.15);
+      --alexa-cyan: #00e5ff;
+      --alexa-blue: #0077ff;
+      --alexa-glow: rgba(0, 229, 255, 0.35);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(0, 119, 255, 0.12) 0%, transparent 60%),
+        radial-gradient(circle at 85% 30%, rgba(0, 229, 255, 0.06) 0%, transparent 40%),
+        radial-gradient(circle at 15% 70%, rgba(99, 102, 241, 0.08) 0%, transparent 40%);
+      color: var(--text-main);
+      font-family: var(--font-body);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px;
+      overflow-x: hidden;
+    }
+
+    /* Container */
+    .app-shell {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      height: calc(100vh - 32px);
+    }
+
+    /* Top Nav / Status Bar */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--alexa-cyan), var(--alexa-blue));
+      display: grid;
+      place-items: center;
+      color: #000;
+      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 20px;
+      box-shadow: 0 0 16px var(--alexa-glow);
+    }
+
+    .brand-text h1 {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-badge {
+      font-size: 0.65rem;
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--alexa-cyan);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      padding: 2px 6px;
+      border-radius: 20px;
+      text-transform: uppercase;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+
+    .brand-text p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 6px 12px;
+      border-radius: 30px;
+      background: rgba(16, 185, 129, 0.1);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #34d399;
+      font-weight: 500;
+    }
+
+    .status-badge.offline {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+    }
+
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-icon.active {
+      color: var(--alexa-cyan);
+      border-color: var(--alexa-cyan);
+      box-shadow: 0 0 10px rgba(0, 229, 255, 0.2);
+    }
+
+    /* Alexa Orb Zone */
+    .orb-zone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 14px 0 6px 0;
+      gap: 8px;
+    }
+
+    .alexa-orb {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #80f0ff, #0077ff 60%, #001f54);
+      position: relative;
+      box-shadow: 
+        0 0 25px var(--alexa-glow),
+        inset 0 0 15px rgba(255, 255, 255, 0.6);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .alexa-orb::before {
+      content: '';
+      position: absolute;
+      inset: -5px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      border-top-color: var(--alexa-cyan);
+      border-right-color: var(--alexa-blue);
+      animation: spin 3s linear infinite;
+      opacity: 0.8;
+    }
+
+    .alexa-orb.thinking {
+      transform: scale(1.1);
+      box-shadow: 0 0 40px rgba(0, 229, 255, 0.8);
+      animation: pulse 1.2s ease-in-out infinite alternate;
+    }
+
+    .alexa-orb.speaking {
+      animation: ripple 0.8s ease-in-out infinite alternate;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @keyframes pulse {
+      from { transform: scale(1.05); filter: hue-rotate(0deg); }
+      to { transform: scale(1.18); filter: hue-rotate(40deg); }
+    }
+
+    @keyframes ripple {
+      from { box-shadow: 0 0 20px var(--alexa-glow); }
+      to { box-shadow: 0 0 45px rgba(0, 229, 255, 0.9); }
+    }
+
+    .orb-label {
+      font-size: 0.76rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      font-weight: 600;
+      color: var(--alexa-cyan);
+      opacity: 0.9;
+    }
+
+    /* Main Chat Display */
+    .chat-container {
+      flex: 1;
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 82%;
+      animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      align-self: flex-end;
+    }
+
+    .message.alexa {
+      align-self: flex-start;
+      max-width: 88%;
+    }
+
+    .bubble {
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 0.92rem;
+      line-height: 1.55;
+      position: relative;
+    }
+
+    .message.user .bubble {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.25);
+    }
+
+    .message.alexa .bubble {
+      background: rgba(30, 41, 59, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #e2e8f0;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .meta-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .message.user .meta-tag {
+      color: #bae6fd;
+      justify-content: flex-end;
+    }
+
+    .message.alexa .meta-tag {
+      color: var(--alexa-cyan);
+    }
+
+    /* Structured content within Alexa bubble */
+    .bubble pre {
+      white-space: pre-wrap;
+      font-family: inherit;
+      margin-top: 4px;
+    }
+
+    .highlight-card {
+      margin-top: 8px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.6);
+      border-left: 3px solid var(--alexa-cyan);
+      font-size: 0.84rem;
+    }
+
+    /* Tool Call Inspector Box */
+    .tool-inspector {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      background: rgba(10, 15, 26, 0.85);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .tool-header {
+      background: rgba(0, 229, 255, 0.08);
+      padding: 6px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+      color: var(--alexa-cyan);
+      font-weight: 500;
+    }
+
+    .tool-header:hover {
+      background: rgba(0, 229, 255, 0.12);
+    }
+
+    .tool-body {
+      padding: 8px 10px;
+      display: none;
+      border-top: 1px solid rgba(0, 229, 255, 0.1);
+      color: #94a3b8;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .tool-body.open {
+      display: block;
+    }
+
+    .tool-tag {
+      background: rgba(0, 229, 255, 0.15);
+      color: var(--alexa-cyan);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    /* Demo Scenario Chips */
+    .scenario-chips {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 4px 2px;
+      scrollbar-width: none;
+    }
+
+    .scenario-chips::-webkit-scrollbar {
+      display: none;
+    }
+
+    .chip {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    .chip:hover {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: rgba(56, 189, 248, 0.35);
+      color: var(--text-main);
+      transform: translateY(-1px);
+    }
+
+    /* Input Dock */
+    .input-dock {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 18px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    }
+
+    .mic-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--alexa-cyan), var(--alexa-blue));
+      border: none;
+      color: #000;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      box-shadow: 0 0 15px var(--alexa-glow);
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .mic-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .mic-btn.listening {
+      background: linear-gradient(135deg, #f43f5e, #e11d48);
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.6);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .input-dock input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-family: inherit;
+      font-size: 0.95rem;
+      padding: 8px 4px;
+    }
+
+    .input-dock input::placeholder {
+      color: #64748b;
+    }
+
+    .send-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .send-btn:hover {
+      background: var(--alexa-cyan);
+      color: #000;
+      border-color: var(--alexa-cyan);
+      box-shadow: 0 0 12px var(--alexa-glow);
+    }
+
+    /* Settings Modal Drawer */
+    .settings-panel {
+      display: none;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px;
+      font-size: 0.82rem;
+      gap: 12px;
+      flex-direction: column;
+    }
+
+    .settings-panel.open {
+      display: flex;
+    }
+
+    .setting-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .setting-row label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .setting-row input {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      padding: 6px 10px;
+      color: var(--text-main);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-shell">
+
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="brand-icon">G</div>
+        <div class="brand-text">
+          <h1>Alexa+ <span class="brand-badge">Family Admin</span></h1>
+          <p>Model Context Protocol (FastMCP) · Voice & Chat Simulator</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div id="statusBadge" class="status-badge">
+          <span class="status-dot"></span>
+          <span id="statusText">Demo (Local Engine)</span>
+        </div>
+        <button id="ttsToggle" class="btn-icon active" title="Toggle Voice Response (TTS)">🔊</button>
+        <button id="settingsToggle" class="btn-icon" title="Server Connection Settings">⚙️</button>
+      </div>
+    </header>
+
+    <!-- Settings Drawer (Hidden by default) -->
+    <div id="settingsPanel" class="settings-panel">
+      <div class="setting-row">
+        <label for="serverUrl">MCP Server URL (Streamable HTTP):</label>
+        <input type="text" id="serverUrl" value="http://localhost:8000/mcp">
+      </div>
+      <div class="setting-row">
+        <label for="serverToken">Bearer Access Token (GLEAN_ACCESS_TOKEN):</label>
+        <input type="password" id="serverToken" placeholder="Leave empty for dev mode">
+      </div>
+      <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px;">
+        <button id="testConnBtn" class="chip" style="padding: 6px 12px;">Test Server Connection</button>
+      </div>
+    </div>
+
+    <!-- Alexa Visual Orb Indicator -->
+    <div class="orb-zone">
+      <div id="alexaOrb" class="alexa-orb"></div>
+      <div id="orbLabel" class="orb-label">Alexa+ Ready</div>
+    </div>
+
+    <!-- Chat Stream -->
+    <div id="chatArea" class="chat-container">
+      <!-- Welcome message -->
+      <div class="message alexa">
+        <div class="meta-tag">✨ ALEXA+ · FAMILY AGENT</div>
+        <div class="bubble">
+          Hello! I'm your Family Admin assistant. I keep track of everyone's documents, deadlines, and benefits so nothing gets lost.
+          <br><br>
+          Try asking:
+          <div class="highlight-card">
+            • <em>"What documents are expiring soon?"</em><br>
+            • <em>"What schemes does Ramesh qualify for?"</em><br>
+            • <em>"Plan the Senior Citizens Savings Scheme application for Suresh"</em><br>
+            • <em>"Give me the family morning briefing"</em>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Scenario Presets for Demo Video -->
+    <div class="scenario-chips">
+      <div class="chip" onclick="sendPrompt('Give me the full family briefing')">
+        📋 Morning Briefing
+      </div>
+      <div class="chip" onclick="sendPrompt('What documents are expiring soon?')">
+        ⏳ Expiring Documents
+      </div>
+      <div class="chip" onclick="sendPrompt('What schemes does Ramesh qualify for?')">
+        🎯 Check Ramesh's Schemes
+      </div>
+      <div class="chip" onclick="sendPrompt('Plan the SCSS application for Suresh')">
+        🚀 Plan SCSS for Suresh
+      </div>
+      <div class="chip" onclick="sendPrompt('What documents are needed for Ayushman Vay Vandana?')">
+        📑 Ayushman Checklist
+      </div>
+      <div class="chip" onclick="sendPrompt('List all family members')">
+        👨‍👩‍👧‍👦 Family List
+      </div>
+    </div>
+
+    <!-- Input Dock -->
+    <div class="input-dock">
+      <button id="micBtn" class="mic-btn" title="Speak to Alexa+">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+          <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+      </button>
+
+      <input type="text" id="userInput" placeholder="Ask Alexa+ by voice or type here..." autocomplete="off">
+
+      <button id="sendBtn" class="send-btn" title="Send message">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+
+  <script>
+    // -------------------------------------------------------------------------
+    // Glean Family Admin — Local Intent Router & Simulation Data Engine
+    // -------------------------------------------------------------------------
+
+    let ttsEnabled = true;
+    let isListening = false;
+    let recognition = null;
+
+    // Built-in Demo Data State (Used when local FastMCP server is not connected)
+    const mockState = {
+      family: [
+        { name: "Ramesh", relation: "grandfather", birth_year: 1950, status: "retired" },
+        { name: "Suresh", relation: "father", birth_year: 1966, status: "employed" },
+        { name: "Sunita", relation: "mother", birth_year: 1970, status: "homemaker" },
+        { name: "Maria", relation: "daughter", birth_year: 2005, status: "student" }
+      ],
+      documents: [
+        { member: "Ramesh", type: "Passport", expiry: "2026-10-14" }, // 7 days left
+        { member: "Maria", type: "Driving Licence", expiry: "2026-10-28" }, // 21 days left
+        { member: "Sunita", type: "Aadhaar Card", expiry: "2030-01-01" }
+      ],
+      tasks: [
+        { title: "Renew Ramesh's passport appointment", due: "2026-10-12", member: "Ramesh", done: false },
+        { title: "Collect electricity bill receipt", due: "2026-10-18", member: "Suresh", done: false }
+      ],
+      schemes: [
+        {
+          id: "ayushman_vay_vandana",
+          name: "Ayushman Vay Vandana Card (AB PM-JAY)",
+          rules: { min_age: 70 },
+          documents: ["Aadhaar card (age is verified from Aadhaar)", "Mobile number for Aadhaar e-KYC"],
+          notes: "Health cover for senior citizens aged 70+. Income is not a barrier.",
+          source_url: "https://beneficiary.nha.gov.in"
+        },
+        {
+          id: "scss",
+          name: "Senior Citizens Savings Scheme (SCSS)",
+          rules: { min_age: 60 },
+          documents: ["Age proof", "Identity & address proof (PAN, voter ID, passport)", "Passport-size photos"],
+          notes: "Government-backed savings deposit offering quarterly interest at post offices and banks.",
+          source_url: "https://www.indiapost.gov.in"
+        },
+        {
+          id: "apy",
+          name: "Atal Pension Yojana (APY)",
+          rules: { min_age: 18, max_age: 40, excludes: ["income_tax_payer"] },
+          documents: ["Savings bank or post office account", "Mobile number", "Nominee details"],
+          notes: "Guaranteed monthly pension of Rs 1,000–5,000 after age 60.",
+          source_url: "https://enps.nsdl.com"
+        },
+        {
+          id: "ignoaps_mh",
+          name: "Indira Gandhi National Old Age Pension Scheme",
+          rules: { min_age: 65, requires: ["bpl"] },
+          documents: ["Age proof", "BPL certificate", "Bank account details"],
+          notes: "Monthly pension for seniors from BPL families.",
+          source_url: "https://sjsa.maharashtra.gov.in"
+        }
+      ]
+    };
+
+    // -------------------------------------------------------------------------
+    // Intent Router (Dispatches User Queries to MCP Tools)
+    // -------------------------------------------------------------------------
+
+    async function dispatchIntent(prompt) {
+      const q = prompt.toLowerCase();
+      let toolName = "";
+      let toolArgs = {};
+      let resultText = "";
+
+      // 1. Briefing
+      if (q.includes("brief") || q.includes("morning") || q.includes("update") || q.includes("summary")) {
+        toolName = "family_brief";
+        toolArgs = {};
+        resultText = runLocalFamilyBrief();
+      }
+      // 2. Expiring Documents
+      else if (q.includes("expir") || q.includes("document") && (q.includes("soon") || q.includes("renew") || q.includes("due"))) {
+        toolName = "get_expiring_documents";
+        toolArgs = { days: 30 };
+        resultText = runLocalExpiringDocs(30);
+      }
+      // 3. Multi-Step Planning
+      else if (q.includes("plan") || q.includes("apply") && q.includes("for")) {
+        toolName = "plan_scheme_application";
+        let targetPerson = q.includes("suresh") ? "Suresh" : (q.includes("ramesh") ? "Ramesh" : "Maria");
+        let targetScheme = q.includes("scss") || q.includes("saving") ? "scss" : (q.includes("ayushman") ? "ayushman_vay_vandana" : "apy");
+        toolArgs = { name: targetPerson, scheme: targetScheme, days_to_prepare: 7 };
+        resultText = runLocalPlanScheme(targetPerson, targetScheme, 7);
+      }
+      // 4. Scheme Eligibility Check
+      else if (q.includes("scheme") || q.includes("qualif") || q.includes("benefit") || q.includes("eligible")) {
+        toolName = "check_scheme_eligibility";
+        let targetPerson = q.includes("suresh") ? "Suresh" : (q.includes("ramesh") ? "Ramesh" : "Sunita");
+        toolArgs = { name: targetPerson, tags: "" };
+        resultText = runLocalEligibility(targetPerson);
+      }
+      // 5. Scheme Checklist
+      else if (q.includes("checklist") || (q.includes("needed") && q.includes("document"))) {
+        toolName = "get_scheme_checklist";
+        let scheme = q.includes("ayushman") ? "ayushman_vay_vandana" : (q.includes("scss") ? "scss" : "apy");
+        toolArgs = { scheme: scheme };
+        resultText = runLocalChecklist(scheme);
+      }
+      // 6. List Members
+      else if (q.includes("family") || q.includes("member") || q.includes("who is")) {
+        toolName = "list_family_members";
+        toolArgs = {};
+        resultText = mockState.family.map(f => `${f.name} (${f.relation}) — born ${f.birth_year}, ${f.status}`).join("\n");
+      }
+      // 7. Upcoming Tasks
+      else if (q.includes("task") || q.includes("deadline")) {
+        toolName = "list_upcoming_tasks";
+        toolArgs = { days: 30 };
+        resultText = mockState.tasks.map(t => `${t.title} (${t.member}) — due ${t.due} (urgent)`).join("\n");
+      }
+      // Default Fallback
+      else {
+        toolName = "family_brief";
+        toolArgs = {};
+        resultText = "Here's what I have on your family paperwork right now:\n\n" + runLocalFamilyBrief();
+      }
+
+      // Try sending to real MCP server if configured
+      const liveResponse = await tryCallLiveMCP(toolName, toolArgs);
+      if (liveResponse) {
+        return { toolName, toolArgs, resultText: liveResponse, isLive: true };
+      }
+
+      return { toolName, toolArgs, resultText, isLive: false };
+    }
+
+    // -------------------------------------------------------------------------
+    // Local Simulation Functions (Matching exact FastMCP logic)
+    // -------------------------------------------------------------------------
+
+    function runLocalFamilyBrief() {
+      return `Family Briefing (${mockState.family.length} family members tracked):
+
+Expiring Documents (next 30 days): 2
+• Ramesh's Passport: 2026-10-14 (urgent, 7d left)
+• Maria's Driving Licence: 2026-10-28 (21d left)
+
+Upcoming Tasks (next 14 days): 1
+• Renew Ramesh's passport appointment (Ramesh) — due 2026-10-12 (5d left)`;
+    }
+
+    function runLocalExpiringDocs(days) {
+      return `Ramesh's Passport - 2026-10-14 (URGENT, 7 days left)
+Maria's Driving Licence - 2026-10-28 (21 days left)`;
+    }
+
+    function runLocalEligibility(person) {
+      const member = mockState.family.find(f => f.name.toLowerCase() === person.toLowerCase()) || mockState.family[0];
+      const age = 2026 - member.birth_year;
+      
+      let eligible = [];
+      let notEligible = [];
+
+      mockState.schemes.forEach(s => {
+        if (s.rules.min_age && age >= s.rules.min_age) {
+          eligible.push(`• ${s.name} — age ${age} fits the age rule. Link: ${s.source_url}`);
+        } else if (s.rules.max_age && age <= s.rules.max_age && (!s.rules.min_age || age >= s.rules.min_age)) {
+          eligible.push(`• ${s.name} — age ${age} fits the criteria. Link: ${s.source_url}`);
+        } else {
+          notEligible.push(`• ${s.name} — age requirement not met`);
+        }
+      });
+
+      return `Eligibility check for ${member.name} (born ${member.birth_year}, age ${age}):
+
+May be eligible:
+${eligible.join("\n")}
+
+Not eligible:
+${notEligible.join("\n")}
+
+Note: Guidance only. Please verify details on official government portals.`;
+    }
+
+    function runLocalPlanScheme(person, schemeId, days) {
+      const scheme = mockState.schemes.find(s => s.id === schemeId) || mockState.schemes[1];
+      const gatherDate = "2026-10-14";
+      const submitDate = "2026-10-21";
+
+      mockState.tasks.push({
+        title: `Gather docs for ${scheme.name}`,
+        due: gatherDate,
+        member: person,
+        done: false
+      });
+
+      return `Application plan created for ${person} — ${scheme.name}:
+• Status: May Be Eligible (age fits rule)
+• Task 1 created: Gather documents by ${gatherDate}
+• Task 2 created: Submit application by ${submitDate}
+• Official portal: ${scheme.source_url}
+
+Documents needed:
+${scheme.documents.map(d => `  - ${d}`).join("\n")}`;
+    }
+
+    function runLocalChecklist(schemeId) {
+      const scheme = mockState.schemes.find(s => s.id === schemeId) || mockState.schemes[0];
+      return `Document Checklist for ${scheme.name}:
+State: All India
+Summary: Health cover & benefits for senior citizens.
+
+Required Documents:
+${scheme.documents.map(d => `• ${d}`).join("\n")}
+
+Notes: ${scheme.notes}
+Official details: ${scheme.source_url}`;
+    }
+
+    // -------------------------------------------------------------------------
+    // Live MCP Streamable HTTP Connector
+    // -------------------------------------------------------------------------
+
+    async function tryCallLiveMCP(toolName, toolArgs) {
+      const serverUrl = document.getElementById("serverUrl").value.trim();
+      const token = document.getElementById("serverToken").value.trim();
+
+      try {
+        const headers = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+
+        const payload = {
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "tools/call",
+          params: { name: toolName, arguments: toolArgs }
+        };
+
+        const res = await fetch(serverUrl, {
+          method: "POST",
+          headers: headers,
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(1200)
+        });
+
+        if (res.ok) {
+          const json = await res.json();
+          updateStatus(true);
+          if (json.result && json.result.content) {
+            return json.result.content.map(c => c.text).join("\n");
+          }
+        }
+      } catch (err) {
+        // Fall back gracefully to local engine
+      }
+      return null;
+    }
+
+    function updateStatus(isOnline) {
+      const badge = document.getElementById("statusBadge");
+      const text = document.getElementById("statusText");
+      if (isOnline) {
+        badge.className = "status-badge";
+        text.textContent = "Live MCP (Connected)";
+      } else {
+        badge.className = "status-badge offline";
+        text.textContent = "Demo (Local Engine)";
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // UI Chat Controller
+    // -------------------------------------------------------------------------
+
+    const chatArea = document.getElementById("chatArea");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const micBtn = document.getElementById("micBtn");
+    const alexaOrb = document.getElementById("alexaOrb");
+    const orbLabel = document.getElementById("orbLabel");
+
+    function setOrbState(state, label) {
+      alexaOrb.className = "alexa-orb " + (state || "");
+      orbLabel.textContent = label || "Alexa+ Ready";
+    }
+
+    async function handleSend() {
+      const text = userInput.value.trim();
+      if (!text) return;
+
+      userInput.value = "";
+      appendMessage("user", text);
+
+      setOrbState("thinking", "Alexa+ Thinking...");
+
+      const startTime = performance.now();
+      const response = await dispatchIntent(text);
+      const latency = Math.round(performance.now() - startTime);
+
+      setOrbState("speaking", "Alexa+ Speaking...");
+      appendMessage("alexa", response.resultText, response.toolName, response.toolArgs, latency, response.isLive);
+
+      if (ttsEnabled) {
+        speakResponse(response.resultText);
+      } else {
+        setTimeout(() => setOrbState("", "Alexa+ Ready"), 1200);
+      }
+    }
+
+    function appendMessage(sender, text, toolName, toolArgs, latency, isLive) {
+      const msgDiv = document.createElement("div");
+      msgDiv.className = `message ${sender}`;
+
+      const meta = document.createElement("div");
+      meta.className = "meta-tag";
+      meta.textContent = sender === "user" ? "YOU" : "✨ ALEXA+";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.innerHTML = `<pre>${escapeHtml(text)}</pre>`;
+
+      msgDiv.appendChild(meta);
+      msgDiv.appendChild(bubble);
+
+      // Tool Call Inspector for Alexa responses
+      if (sender === "alexa" && toolName) {
+        const inspector = document.createElement("div");
+        inspector.className = "tool-inspector";
+        inspector.innerHTML = `
+          <div class="tool-header" onclick="this.nextElementSibling.classList.toggle('open')">
+            <span>⚙️ MCP Tool Call: <span class="tool-tag">${toolName}()</span></span>
+            <span>${latency || 12}ms · ${isLive ? 'Live HTTP' : 'Simulated'} ▾</span>
+          </div>
+          <div class="tool-body">
+            <strong>Arguments:</strong>
+            <pre>${JSON.stringify(toolArgs, null, 2)}</pre>
+          </div>
+        `;
+        msgDiv.appendChild(inspector);
+      }
+
+      chatArea.appendChild(msgDiv);
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    function sendPrompt(text) {
+      userInput.value = text;
+      handleSend();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+
+    // -------------------------------------------------------------------------
+    // Voice Synthesis (TTS) & Recognition (STT)
+    // -------------------------------------------------------------------------
+
+    function speakResponse(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+
+      // Clean markdown bullets for speech
+      const spokenText = text
+        .replace(/•/g, "")
+        .replace(/https?:\/\/\S+/g, "on the official website")
+        .slice(0, 280); // Keep voice summary concise
+
+      const utterance = new SpeechSynthesisUtterance(spokenText);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+
+      utterance.onend = () => setOrbState("", "Alexa+ Ready");
+      utterance.onerror = () => setOrbState("", "Alexa+ Ready");
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // Speech-to-Text Setup
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add("listening");
+        setOrbState("thinking", "Listening...");
+      };
+
+      recognition.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        userInput.value = transcript;
+        handleSend();
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove("listening");
+        setOrbState("", "Alexa+ Ready");
+      };
+    }
+
+    micBtn.addEventListener("click", () => {
+      if (!recognition) {
+        alert("Speech recognition is not supported in this browser. Try Chrome/Edge!");
+        return;
+      }
+      if (isListening) {
+        recognition.stop();
+      } else {
+        recognition.start();
+      }
+    });
+
+    sendBtn.addEventListener("click", handleSend);
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") handleSend();
+    });
+
+    // TTS Toggle
+    const ttsToggle = document.getElementById("ttsToggle");
+    ttsToggle.addEventListener("click", () => {
+      ttsEnabled = !ttsEnabled;
+      ttsToggle.classList.toggle("active", ttsEnabled);
+      ttsToggle.textContent = ttsEnabled ? "🔊" : "🔇";
+      if (!ttsEnabled && 'speechSynthesis' in window) window.speechSynthesis.cancel();
+    });
+
+    // Settings Toggle
+    const settingsToggle = document.getElementById("settingsToggle");
+    const settingsPanel = document.getElementById("settingsPanel");
+    settingsToggle.addEventListener("click", () => {
+      settingsPanel.classList.toggle("open");
+    });
+
+    document.getElementById("testConnBtn").addEventListener("click", async () => {
+      const res = await tryCallLiveMCP("ping", {});
+      if (res) {
+        alert("Success! Connected to Glean MCP server over Streamable HTTP.");
+        updateStatus(true);
+      } else {
+        alert("Could not reach server at specified URL. Operating in standalone demo mode.");
+        updateStatus(false);
+      }
+    });
+  </script>
+</body>
+</html>
