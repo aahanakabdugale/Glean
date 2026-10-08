@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background pill -->
+  <rect width="32" height="32" rx="8" fill="#7B5EA7"/>
+  <!-- Five dots arcing into a G shape -->
+  <!-- Top arc dots -->
+  <circle cx="10" cy="8"  r="2.2" fill="#ffffff" opacity="0.6"/>
+  <circle cx="16" cy="6"  r="2.2" fill="#ffffff" opacity="0.8"/>
+  <circle cx="22" cy="8"  r="2.2" fill="#ffffff"/>
+  <!-- Right side + crossbar (the G's stem) -->
+  <circle cx="24" cy="16" r="2.2" fill="#ffffff"/>
+  <circle cx="24" cy="22" r="2.2" fill="#00A896"/>
+  <!-- Crossbar dot -->
+  <circle cx="19" cy="22" r="2.2" fill="#00A896" opacity="0.85"/>
+</svg>
