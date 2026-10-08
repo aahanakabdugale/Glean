@@ -1,0 +1,277 @@
+/* ============================================================
+   GLEAN DESIGN SYSTEM
+   All CSS variables live here. Components use var(--name) only —
+   never hardcoded colours. This makes both themes work automatically.
+   ============================================================ */
+
+/* ---------- Font imports (local, no CDN) ---------- */
+@import '@fontsource/syne/400.css';
+@import '@fontsource/syne/700.css';
+@import '@fontsource/syne/800.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+
+/* ---------- LIGHT THEME (default) ---------- */
+:root {
+  color-scheme: light;
+
+  /* Surfaces */
+  --bg:          #F5F2EE;   /* warm cream page background */
+  --surface:     #FFFFFF;   /* cards, panels */
+  --surface-2:   #EDE9E3;   /* slightly tinted surface */
+  --surface-3:   #E2DDD7;   /* input backgrounds */
+  --border:      rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.14);
+  --shadow:      0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+
+  /* Text */
+  --text:        #1A1412;   /* primary */
+  --text-2:      #4A453F;   /* secondary */
+  --text-muted:  #7A7067;   /* placeholders, meta */
+  --text-inverse:#F2EFE9;   /* on dark surfaces */
+
+  /* Semantic colours — each has a bg tint and a text colour for that tint */
+  --coral:       #E8533A;   /* urgent / expired */
+  --coral-bg:    rgba(232, 83, 58, 0.10);
+  --coral-text:  #B53220;
+
+  --amber:       #D97706;   /* soon / warning */
+  --amber-bg:    rgba(217, 119, 6, 0.10);
+  --amber-text:  #92520A;
+
+  --teal:        #00897B;   /* safe / connected / success */
+  --teal-bg:     rgba(0, 137, 123, 0.10);
+  --teal-text:   #006358;
+
+  --violet:      #7B5EA7;   /* AI / schemes / brand */
+  --violet-bg:   rgba(123, 94, 167, 0.10);
+  --violet-text: #5B3F87;
+
+  --sky:         #2563EB;   /* tasks / user bubble / orb idle */
+  --sky-bg:      rgba(37, 99, 235, 0.10);
+  --sky-text:    #1849B4;
+
+  --green:       #16A34A;   /* done / checked */
+  --green-bg:    rgba(22, 163, 74, 0.10);
+  --green-text:  #0F7035;
+
+  /* Brand gradient (used on orb, logo, highlights) */
+  --brand-grad:  linear-gradient(135deg, #7B5EA7 0%, #00897B 100%);
+  --brand-grad-2:linear-gradient(135deg, #E8533A 0%, #D97706 100%); /* warm accent */
+
+  /* Orb state colours */
+  --orb-idle:    #2563EB;
+  --orb-listen:  #E8533A;
+  --orb-think:   #7B5EA7;
+  --orb-speak:   #00897B;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'Inter', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Spacing scale (4px base) */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Radii */
+  --r-sm:  8px;
+  --r-md:  12px;
+  --r-lg:  16px;
+  --r-xl:  24px;
+  --r-full: 9999px;
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t-fast:   150ms;
+  --t-base:   220ms;
+  --t-slow:   400ms;
+
+  /* Theme transition — smooth background/text swap when toggling */
+  --theme-transition: background-color var(--t-slow) ease,
+                      color var(--t-slow) ease,
+                      border-color var(--t-slow) ease;
+}
+
+/* ---------- DARK THEME ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg:          #0F0E17;
+  --surface:     #1A1929;
+  --surface-2:   #221F35;
+  --surface-3:   #2A2640;
+  --border:      rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --shadow:      0 2px 12px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-lg:   0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+
+  --text:        #F2EFE9;
+  --text-2:      #BDB8AF;
+  --text-muted:  #8A8499;
+  --text-inverse:#1A1412;
+
+  --coral:       #FF6B52;
+  --coral-bg:    rgba(255, 107, 82, 0.12);
+  --coral-text:  #FF8A72;
+
+  --amber:       #FFBA3A;
+  --amber-bg:    rgba(255, 186, 58, 0.12);
+  --amber-text:  #FFD07A;
+
+  --teal:        #00CDB8;
+  --teal-bg:     rgba(0, 205, 184, 0.12);
+  --teal-text:   #00EDD6;
+
+  --violet:      #A07FD8;
+  --violet-bg:   rgba(160, 127, 216, 0.12);
+  --violet-text: #C4A8F5;
+
+  --sky:         #60A5FA;
+  --sky-bg:      rgba(96, 165, 250, 0.12);
+  --sky-text:    #93C5FD;
+
+  --green:       #4ADE80;
+  --green-bg:    rgba(74, 222, 128, 0.12);
+  --green-text:  #86EFAC;
+
+  --brand-grad:  linear-gradient(135deg, #A07FD8 0%, #00CDB8 100%);
+  --brand-grad-2:linear-gradient(135deg, #FF6B52 0%, #FFBA3A 100%);
+
+  --orb-idle:    #60A5FA;
+  --orb-listen:  #FF6B52;
+  --orb-think:   #A07FD8;
+  --orb-speak:   #00CDB8;
+}
+
+/* ---------- BASE RESET ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 0.9375rem; /* 15px */
+  line-height: 1.6;
+  color: var(--text);
+  background-color: var(--bg);
+  transition: var(--theme-transition);
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+/* Mesh gradient blobs (CSS only, no images) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 20%, var(--violet-bg) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 35% at 85% 75%, var(--teal-bg) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 80% 10%, var(--sky-bg) 0%, transparent 60%);
+  transition: var(--theme-transition);
+}
+
+/* Everything sits above the gradient */
+#app {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- TYPOGRAPHY ---------- */
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--text);
+}
+
+code, pre, .mono {
+  font-family: var(--font-mono);
+}
+
+/* ---------- FOCUS RINGS (accessibility) ---------- */
+:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+
+/* ---------- SCROLLBAR (subtle) ---------- */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--r-full);
+}
+
+/* ---------- REDUCED MOTION ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- UTILITY CLASSES ---------- */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
+  transition: var(--theme-transition);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 2px var(--sp-2);
+  border-radius: var(--r-full);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.badge-coral  { background: var(--coral-bg);  color: var(--coral-text); }
+.badge-amber  { background: var(--amber-bg);  color: var(--amber-text); }
+.badge-teal   { background: var(--teal-bg);   color: var(--teal-text);  }
+.badge-violet { background: var(--violet-bg); color: var(--violet-text);}
+.badge-sky    { background: var(--sky-bg);    color: var(--sky-text);   }
+.badge-green  { background: var(--green-bg);  color: var(--green-text); }
