@@ -2,7 +2,7 @@ import datetime
 import logging
 import sqlite3
 
-from glean import db
+from glean import db, schemes
 from glean.app import mcp
 
 logger = logging.getLogger(__name__)
@@ -211,5 +211,228 @@ def list_upcoming_tasks(days: int = 30) -> str:
             status = f"{left} days left"
         who = f" ({r['name']})" if r["name"] else ""
         lines.append(f"{r['title']}{who} - {r['due_date']} ({status})")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def check_scheme_eligibility(name: str, tags: str = "") -> str:
+    """Check government scheme eligibility for a family member by name.
+    Optional tags can be provided as comma-separated labels (e.g. 'bpl', 'income_tax_payer')."""
+    name = name.strip()
+    if not name:
+        return "Please provide a family member's name."
+
+    try:
+        conn = db.get_connection()
+        member = conn.execute(
+            "SELECT name, birth_year FROM family_members WHERE name = ?", (name,)
+        ).fetchone()
+        if member is None:
+            return f"I don't know anyone called {name}. Add them first."
+
+        parsed_tags = {t.strip().lower() for t in tags.split(",") if t.strip()}
+        results = schemes.check_eligibility(member["birth_year"], parsed_tags)
+    except Exception as exc:
+        logger.error("check_scheme_eligibility failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    lines = [f"Eligibility check for {member['name']} (born {member['birth_year']}):"]
+
+    eligible = [r for r in results if r["status"] == "may_be_eligible"]
+    check_needed = [r for r in results if r["status"] == "check_needed"]
+    not_eligible = [r for r in results if r["status"] == "not_eligible"]
+
+    if eligible:
+        lines.append("\nMay be eligible:")
+        for r in eligible:
+            reason = "; ".join(r["reasons"])
+            lines.append(f"• {r['name']} — {reason}. Official link: {r['source_url']}")
+
+    if check_needed:
+        lines.append("\nRequires verification:")
+        for r in check_needed:
+            confirm = "; ".join(r["confirm"])
+            lines.append(f"• {r['name']} — {confirm}. Official link: {r['source_url']}")
+
+    if not_eligible:
+        lines.append("\nNot eligible:")
+        for r in not_eligible:
+            reason = "; ".join(r["reasons"])
+            lines.append(f"• {r['name']} — {reason}")
+
+    lines.append("\nNote: Guidance only. Please verify details on official government portals.")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def get_scheme_checklist(scheme: str) -> str:
+    """Get the document checklist and application info for a government scheme.
+    Pass either the scheme ID (e.g. 'ayushman_vay_vandana', 'apy', 'scss', 'ignoaps_mh') or scheme name."""
+    scheme_query = scheme.strip().lower()
+    if not scheme_query:
+        return "Please provide a scheme name or ID."
+
+    all_schemes = schemes.load_schemes()
+    matched = None
+    for s in all_schemes:
+        if s["id"].lower() == scheme_query or scheme_query in s["name"].lower():
+            matched = s
+            break
+
+    if not matched:
+        available = ", ".join(f"{s['name']} (ID: {s['id']})" for s in all_schemes)
+        return f"I couldn't find a scheme matching '{scheme}'. Available schemes: {available}."
+
+    lines = [
+        f"Document Checklist for {matched['name']}:",
+        f"State: {matched.get('state', 'All India')}",
+        f"Summary: {matched.get('summary', '')}",
+        "\nRequired Documents:",
+    ]
+    for doc in matched.get("documents", []):
+        lines.append(f"• {doc}")
+
+    if matched.get("notes"):
+        lines.append(f"\nNotes: {matched['notes']}")
+    if matched.get("source_url"):
+        lines.append(f"Official details: {matched['source_url']}")
+    if matched.get("apply_url"):
+        lines.append(f"Apply online: {matched['apply_url']}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def plan_scheme_application(name: str, scheme: str, days_to_prepare: int = 7) -> str:
+    """Agentic multi-step workflow: checks eligibility, retrieves required documents,
+    and automatically schedules preparation and submission deadlines as family tasks."""
+    name = name.strip()
+    scheme_query = scheme.strip().lower()
+    if not name:
+        return "Please provide a family member's name."
+    if not scheme_query:
+        return "Please provide a scheme name or ID."
+    if not 1 <= days_to_prepare <= 365:
+        return "Please give preparation days between 1 and 365."
+
+    try:
+        conn = db.get_connection()
+        member = conn.execute(
+            "SELECT id, name, birth_year FROM family_members WHERE name = ?", (name,)
+        ).fetchone()
+        if member is None:
+            return f"I don't know anyone called {name}. Add them first."
+
+        all_schemes = schemes.load_schemes()
+        matched = None
+        for s in all_schemes:
+            if s["id"].lower() == scheme_query or scheme_query in s["name"].lower():
+                matched = s
+                break
+
+        if not matched:
+            available = ", ".join(s["name"] for s in all_schemes)
+            return f"I couldn't find '{scheme}'. Available schemes: {available}."
+
+        eligibility_list = schemes.check_eligibility(member["birth_year"])
+        scheme_eval = next((r for r in eligibility_list if r["scheme_id"] == matched["id"]), None)
+
+        today = datetime.date.today()
+        gather_due = today + datetime.timedelta(days=days_to_prepare)
+        apply_due = today + datetime.timedelta(days=days_to_prepare + 7)
+
+        task1_title = f"Gather docs for {matched['name']}"
+        task2_title = f"Submit application for {matched['name']}"
+
+        conn.execute(
+            "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
+            (task1_title, gather_due.isoformat(), member["id"]),
+        )
+        conn.execute(
+            "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
+            (task2_title, apply_due.isoformat(), member["id"]),
+        )
+        conn.commit()
+    except Exception as exc:
+        logger.error("plan_scheme_application failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    status_str = scheme_eval["status"].replace("_", " ").title() if scheme_eval else "Evaluated"
+    reasons = "; ".join(scheme_eval.get("reasons", [])) if scheme_eval else ""
+
+    lines = [
+        f"Application plan created for {member['name']} — {matched['name']}:",
+        f"• Eligibility status: {status_str} ({reasons})",
+        f"• Task 1 created: Gather documents by {gather_due.isoformat()}",
+        f"• Task 2 created: Submit application by {apply_due.isoformat()}",
+        f"• Official portal: {matched.get('apply_url') or matched.get('source_url')}",
+        "\nDocuments needed:",
+    ]
+    for d in matched.get("documents", []):
+        lines.append(f"  - {d}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+def family_brief() -> str:
+    """Provide a comprehensive spoken-style summary of family paperwork:
+    expiring documents, upcoming deadlines, and pending tasks."""
+    today = datetime.date.today()
+    cutoff_docs = today + datetime.timedelta(days=30)
+    cutoff_tasks = today + datetime.timedelta(days=14)
+
+    try:
+        conn = db.get_connection()
+        members = conn.execute("SELECT COUNT(*) FROM family_members").fetchone()[0]
+        exp_docs = conn.execute(
+            "SELECT m.name, d.doc_type, d.expiry_date "
+            "FROM documents d JOIN family_members m ON m.id = d.member_id "
+            "WHERE d.expiry_date <= ? "
+            "ORDER BY d.expiry_date",
+            (cutoff_docs.isoformat(),),
+        ).fetchall()
+
+        tasks = conn.execute(
+            "SELECT t.title, t.due_date, m.name "
+            "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+            "WHERE t.done = 0 AND t.due_date <= ? "
+            "ORDER BY t.due_date",
+            (cutoff_tasks.isoformat(),),
+        ).fetchall()
+    except Exception as exc:
+        logger.error("family_brief failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    if members == 0:
+        return "No family members added yet. Start by adding a member."
+
+    lines = [f"Family Briefing ({members} family member{'s' if members != 1 else ''} tracked):"]
+
+    if not exp_docs and not tasks:
+        lines.append("Everything looks great! No documents expiring in the next 30 days and no tasks due in the next 14 days.")
+        return "\n".join(lines)
+
+    if exp_docs:
+        lines.append(f"\nExpiring Documents (next 30 days): {len(exp_docs)}")
+        for r in exp_docs:
+            exp = datetime.date.fromisoformat(r["expiry_date"])
+            left = (exp - today).days
+            urgency = "EXPIRED" if left < 0 else (f"urgent ({left}d left)" if left <= 7 else f"{left}d left")
+            lines.append(f"• {r['name']}'s {r['doc_type']}: {r['expiry_date']} ({urgency})")
+    else:
+        lines.append("\nDocuments: All documents are up to date for the next 30 days.")
+
+    if tasks:
+        lines.append(f"\nUpcoming Tasks (next 14 days): {len(tasks)}")
+        for r in tasks:
+            due = datetime.date.fromisoformat(r["due_date"])
+            left = (due - today).days
+            status = "OVERDUE" if left < 0 else ("due today" if left == 0 else f"{left}d left")
+            who = f" ({r['name']})" if r["name"] else ""
+            lines.append(f"• {r['title']}{who} — due {r['due_date']} ({status})")
+    else:
+        lines.append("\nTasks: No tasks due in the next 14 days.")
 
     return "\n".join(lines)

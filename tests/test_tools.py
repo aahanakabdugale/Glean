@@ -562,3 +562,134 @@ def test_list_tasks_invalid_days_over_limit(db_conn):
     """days=3651 returns the exact validation error."""
     result = list_upcoming_tasks(3651)
     assert result == "Please give a number of days between 0 and 3650."
+
+
+# ---------------------------------------------------------------------------
+# Scheme & Planning Tools: check_scheme_eligibility, get_scheme_checklist,
+# plan_scheme_application, family_brief
+# ---------------------------------------------------------------------------
+
+from glean.tools import (
+    check_scheme_eligibility,
+    get_scheme_checklist,
+    plan_scheme_application,
+    family_brief,
+)
+
+
+def test_check_scheme_eligibility_happy_path(db_conn):
+    """Senior member gets matched against schemes like Ayushman or SCSS."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    result = check_scheme_eligibility("Ramesh")
+    assert "Eligibility check for Ramesh (born 1950):" in result
+    assert "May be eligible:" in result or "Requires verification:" in result
+    assert "Guidance only" in result
+
+
+def test_check_scheme_eligibility_with_tags(db_conn):
+    """Tags like 'bpl' update the eligibility statuses accordingly."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    result = check_scheme_eligibility("Ramesh", tags="bpl")
+    assert "Eligibility check for Ramesh" in result
+    assert "Indira Gandhi National Old Age Pension Scheme" in result
+
+
+def test_check_scheme_eligibility_unknown_person(db_conn):
+    """Unknown person returns friendly guidance to add them first."""
+    result = check_scheme_eligibility("Nobody")
+    assert result == "I don't know anyone called Nobody. Add them first."
+
+
+def test_check_scheme_eligibility_empty_name(db_conn):
+    """Blank name returns friendly validation message."""
+    result = check_scheme_eligibility("   ")
+    assert result == "Please provide a family member's name."
+
+
+def test_get_scheme_checklist_by_id(db_conn):
+    """Fetch checklist by scheme ID."""
+    result = get_scheme_checklist("ayushman_vay_vandana")
+    assert "Document Checklist for Ayushman Vay Vandana Card (AB PM-JAY):" in result
+    assert "Aadhaar card" in result
+    assert "Official details:" in result
+
+
+def test_get_scheme_checklist_by_name(db_conn):
+    """Fetch checklist by scheme name substring."""
+    result = get_scheme_checklist("Atal Pension")
+    assert "Document Checklist for Atal Pension Yojana:" in result
+    assert "Savings bank or post office account" in result
+
+
+def test_get_scheme_checklist_unknown(db_conn):
+    """Unknown scheme returns list of available schemes."""
+    result = get_scheme_checklist("unknown_scheme_xyz")
+    assert "I couldn't find a scheme matching 'unknown_scheme_xyz'" in result
+    assert "Available schemes:" in result
+
+
+def test_get_scheme_checklist_empty(db_conn):
+    """Blank scheme name returns validation message."""
+    result = get_scheme_checklist("   ")
+    assert result == "Please provide a scheme name or ID."
+
+
+def test_plan_scheme_application_happy_path(db_conn):
+    """Multi-step planning creates the tasks in DB and returns the application plan."""
+    add_family_member("Suresh", "father", 1960, "employed")
+    result = plan_scheme_application("Suresh", "scss", days_to_prepare=7)
+    assert "Application plan created for Suresh — Senior Citizens Savings Scheme:" in result
+    assert "Task 1 created: Gather documents" in result
+    assert "Task 2 created: Submit application" in result
+
+    # Verify tasks were added into SQLite database
+    tasks = db_conn.execute("SELECT * FROM tasks WHERE member_id IS NOT NULL").fetchall()
+    assert len(tasks) == 2
+    titles = [t["title"] for t in tasks]
+    assert any("Gather docs for Senior Citizens Savings Scheme" in t for t in titles)
+    assert any("Submit application for Senior Citizens Savings Scheme" in t for t in titles)
+
+
+def test_plan_scheme_application_unknown_person(db_conn):
+    """Unknown person returns friendly error; no tasks saved."""
+    result = plan_scheme_application("Nobody", "scss")
+    assert result == "I don't know anyone called Nobody. Add them first."
+    assert _task_count(db_conn) == 0
+
+
+def test_plan_scheme_application_unknown_scheme(db_conn):
+    """Unknown scheme returns friendly error; no tasks saved."""
+    add_family_member("Suresh", "father", 1960, "employed")
+    result = plan_scheme_application("Suresh", "nonexistent_scheme")
+    assert "I couldn't find 'nonexistent_scheme'" in result
+    assert _task_count(db_conn) == 0
+
+
+def test_family_brief_no_members(db_conn):
+    """Empty database returns friendly startup message."""
+    result = family_brief()
+    assert result == "No family members added yet. Start by adding a member."
+
+
+def test_family_brief_with_data(db_conn):
+    """Comprehensive briefing lists expiring documents and upcoming tasks."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    expiry = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    add_document("passport", "Ramesh", expiry)
+    due = (_dt.date.today() + _dt.timedelta(days=3)).isoformat()
+    add_task("Renew medicine card", due, "Ramesh")
+
+    result = family_brief()
+    assert "Family Briefing (1 family member tracked):" in result
+    assert "Expiring Documents (next 30 days): 1" in result
+    assert "passport" in result
+    assert "Upcoming Tasks (next 14 days): 1" in result
+    assert "Renew medicine card" in result
+
+
+def test_family_brief_all_clear(db_conn):
+    """When members exist but no pending deadlines, reports everything in order."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    result = family_brief()
+    assert "Family Briefing (1 family member tracked):" in result
+    assert "Everything looks great!" in result
