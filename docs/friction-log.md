@@ -62,3 +62,36 @@ Honest notes on problems hit while building Glean, and how each was fixed.
 - **Cause:** The installer keeps the CLI inside its app folder and doesn't add it to PATH.
 - **Fix:** Found `kirocrew.cmd` under `%LOCALAPPDATA%\Programs\KiroCrew\...\bin` and ran it with the full path.
 - **Time lost:** ~10 min
+
+## Day 3 (Wed Oct 7) — Security review
+
+### 10. Token guard needs to be wired manually into each MCP middleware layer
+- **Tool:** FastMCP (MCP Python SDK v2.3.0)
+- **What happened:** `validate_token` and `validate_origin` are written as
+  standalone helpers in `glean/security.py`. FastMCP's Streamable HTTP transport
+  does not expose a first-class middleware hook in v2.3.0, so the helpers cannot
+  be registered once at startup; they have to be called per-tool or via a wrapping
+  Starlette middleware added manually to the uvicorn app.
+- **Fix:** Implemented helpers as pure functions so they can be unit-tested now and
+  wired into transport middleware in a later task without changing their signatures.
+- **Time lost:** ~10 min investigating FastMCP middleware API.
+
+### 11. PII regex false-positive risk on short numeric strings
+- **Tool:** Python re module / `sanitize_input`
+- **What happened:** Initial Aadhaar pattern (`\d{12}`) would have matched any
+  12-digit sequence, including phone numbers or bank account fragments in a task
+  title. Using `\b` word boundaries reduces false positives but does not eliminate
+  them entirely (e.g. a 12-digit string at the start of a sentence).
+- **Fix:** Added `\b` anchors and kept the pattern to the specific formatted variants
+  (plain, space-separated, hyphen-separated). Added a test that verifies short
+  digit strings like birth years are not rejected.
+- **Time lost:** ~15 min adjusting patterns and verifying tests.
+
+### 12. SQL injection regex blocks "selection" — needed word boundary check
+- **Tool:** Python re module / `sanitize_input`
+- **What happened:** First draft of `_SQL_INJECTION_RE` used a plain `SELECT`
+  substring match, which would have blocked the sentence "My document selection is
+  ready". Fixed with `\b` word boundaries so only the standalone keyword is caught.
+- **Fix:** Added `\b` anchors to all SQL keywords in the pattern. Added an explicit
+  test that confirms "selection" is not rejected.
+- **Time lost:** ~5 min.
