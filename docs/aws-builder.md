@@ -140,6 +140,9 @@ single session. The three helpers and their findings:
   word boundaries to avoid blocking words like "selection"), and inputs over 500
   characters. 27 tests; all 49 security tests pass.
 
-FastMCP v2.3.0 does not expose a first-class middleware hook, so the helpers are
-standalone functions for now. Wiring them into transport-level middleware is the
-next task.
+FastMCP v2.3.0 does not expose a first-class middleware hook directly on the
+FastMCP instance, so the security helpers are wired in as a custom Starlette
+`BaseHTTPMiddleware` (`GleanSecurityMiddleware`) wrapping `mcp.streamable_http_app`
+in `server.py`. Origin validation protects all incoming routes, and Bearer token / query
+token checks guard the `/mcp` endpoint while allowing static UI assets to serve smoothly.
+All 49 security unit tests and end-to-end middleware checks pass.

@@ -27,15 +27,13 @@ import uvicorn
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from starlette.routing import Mount
 from starlette.staticfiles import StaticFiles
-from starlette.applications import Starlette
 
 from glean import db
 from glean.app import mcp
 from glean.security import validate_origin, validate_token
 
-import glean.tools  # noqa: F401  — side-effect: registers all 9 tools on mcp
+import glean.tools  # noqa: F401  — side-effect: registers all 10 tools on mcp
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +43,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class GleanSecurityMiddleware(BaseHTTPMiddleware):
-    """Enforce token and Origin checks on every incoming HTTP request."""
+    """Enforce token and Origin checks on incoming HTTP requests."""
 
     async def dispatch(self, request: Request, call_next):
         # --- Origin check ---------------------------------------------------
@@ -59,15 +57,18 @@ class GleanSecurityMiddleware(BaseHTTPMiddleware):
             )
 
         # --- Token check ----------------------------------------------------
-        headers = dict(request.headers)
-        query_params = dict(request.query_params)
-        token_ok, token_err = validate_token(headers, query_params)
-        if not token_ok:
-            logger.warning("Blocked request — bad token from %s", request.client)
-            return JSONResponse(
-                {"error": token_err},
-                status_code=401,
-            )
+        # Token validation guards the MCP endpoint (/mcp).
+        # Static files (the web UI at / and /assets) do not require a token.
+        if request.url.path.startswith("/mcp"):
+            headers = dict(request.headers)
+            query_params = dict(request.query_params)
+            token_ok, token_err = validate_token(headers, query_params)
+            if not token_ok:
+                logger.warning("Blocked request — bad token from %s", request.client)
+                return JSONResponse(
+                    {"error": token_err},
+                    status_code=401,
+                )
 
         return await call_next(request)
 
@@ -77,34 +78,27 @@ class GleanSecurityMiddleware(BaseHTTPMiddleware):
 # ---------------------------------------------------------------------------
 
 def build_app():
-    """Return the Starlette ASGI app with security middleware applied."""
-    # Build the raw MCP Starlette app
+    """Return the MCP Starlette ASGI app with security middleware applied."""
     host = os.environ.get("GLEAN_HOST", "127.0.0.1")
-    mcp_app = mcp.streamable_http_app(host=host)
+    app = mcp.streamable_http_app(host=host)
 
     # Wrap it: middleware is applied outermost-first so security runs before
     # any MCP processing.
-    mcp_app.add_middleware(GleanSecurityMiddleware)
+    app.add_middleware(GleanSecurityMiddleware)
 
     # Locate the built frontend (simulator/dist).
-    # Judges run `python server.py` with no Node.js — this makes it work.
+    # Allows judges to run `python server.py` directly without Node.js.
     here = os.path.dirname(os.path.abspath(__file__))
     dist_dir = os.path.join(here, "simulator", "dist")
 
-    routes = [Mount("/mcp", app=mcp_app)]
-
     if os.path.isdir(dist_dir):
-        # Serve the Glean UI at /
-        routes.append(
-            Mount("/", app=StaticFiles(directory=dist_dir, html=True), name="static")
-        )
+        # Mount built static assets directly on the MCP Starlette app
+        app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")
         logger.info("Serving Glean UI from %s", dist_dir)
     else:
-        logger.warning(
-            "simulator/dist not found — run `cd frontend && npm run build` to build the UI."
-        )
+        logger.info("simulator/dist not found — running in pure MCP mode")
 
-    return Starlette(routes=routes)
+    return app
 
 
 # ---------------------------------------------------------------------------
