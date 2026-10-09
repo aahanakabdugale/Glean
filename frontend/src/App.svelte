@@ -10,8 +10,20 @@
   import InputDock     from './components/InputDock.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
 
-  import { activeView, orbState, settings, addMessage, updateLastMessage } from './lib/store.js';
+  import { onMount } from 'svelte';
+  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList } from './lib/store.js';
   import * as mcp from './lib/mcp.js';
+
+  onMount(async () => {
+    try {
+      const res = await mcp.callListFamilyMembers();
+      if (res && res.resultData && Array.isArray(res.resultData)) {
+        familyMembersList.set(res.resultData);
+      }
+    } catch (e) {
+      // Keep default demo members on error
+    }
+  });
 
   // TTS
   function speak(text) {
@@ -42,21 +54,22 @@
 
     try {
       if (q.includes('brief') || q.includes('morning') || q.includes('summary') || q.includes('update')) {
-        result = await mcp.callFamilyBrief();
+        const persona = $activePersona;
+        result = await mcp.callFamilyBrief(persona);
         result.toolName = 'family_brief';
-        result.toolArgs = {};
+        result.toolArgs = persona && persona !== 'all' ? { member_name: persona } : {};
       } else if (q.includes('expir') || (q.includes('document') && (q.includes('soon') || q.includes('renew')))) {
         result = await mcp.callGetExpiringDocuments(30);
         result.toolName = 'get_expiring_documents';
         result.toolArgs = { days: 30 };
       } else if (q.includes('plan') || (q.includes('apply') && q.includes('for'))) {
-        const person = extractPerson(q) || 'Suresh';
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Suresh');
         const scheme = extractScheme(q) || 'scss';
         result = await mcp.callPlanSchemeApplication(person, scheme, 7);
         result.toolName = 'plan_scheme_application';
         result.toolArgs = { name: person, scheme, days_to_prepare: 7 };
       } else if (q.includes('scheme') || q.includes('qualif') || q.includes('eligible') || q.includes('benefit')) {
-        const person = extractPerson(q) || 'Ramesh';
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Ramesh');
         result = await mcp.callCheckSchemeEligibility(person);
         result.toolName = 'check_scheme_eligibility';
         result.toolArgs = { name: person };
@@ -74,10 +87,11 @@
         result.toolName = 'list_family_members';
         result.toolArgs = {};
       } else {
-        // Default: family brief
-        result = await mcp.callFamilyBrief();
+        // Default: family brief with active persona
+        const persona = $activePersona;
+        result = await mcp.callFamilyBrief(persona);
         result.toolName = 'family_brief';
-        result.toolArgs = {};
+        result.toolArgs = persona && persona !== 'all' ? { member_name: persona } : {};
       }
     } catch (err) {
       result = { text: 'Something went wrong. Please try again.', isLive: false, ms: 0 };
@@ -106,8 +120,15 @@
 
   // Simple keyword extraction for person names and scheme IDs
   function extractPerson(q) {
-    const names = ['ramesh', 'suresh', 'sunita', 'maria'];
-    return names.find(n => q.includes(n))
+    if (q.includes('chandler') || q.includes('grandpa')) return 'Chandler';
+    if (q.includes('amy') || q.includes('grandma')) return 'Amy';
+    if (q.includes('justin') || q.includes('dad') || q.includes('father')) return 'Justin';
+    if (q.includes('riley') || q.includes('mom') || q.includes('mother')) return 'Riley';
+    if (q.includes('jace') || q.includes('son')) return 'Jace';
+    if (q.includes('gwen') || q.includes('daughter')) return 'Gwen';
+
+    const legacyNames = ['ramesh', 'suresh', 'sunita', 'maria'];
+    return legacyNames.find(n => q.includes(n))
       ?.replace(/^./, c => c.toUpperCase()) ?? null;
   }
 

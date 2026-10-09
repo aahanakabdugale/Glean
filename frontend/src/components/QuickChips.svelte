@@ -1,18 +1,21 @@
 <script>
-  // QuickChips.svelte
-  // Horizontally-scrolling prompt shortcuts. Clicking a chip
-  // fires the onChipClick callback with the prompt text.
+  import { activePersona } from '../lib/store.js';
 
   export let onChipClick = (/** @type {string} */ _text) => {};
 
-  const chips = [
-    { emoji: '📋', label: 'Morning Briefing',    prompt: 'Give me the full family briefing' },
-    { emoji: '⏳', label: 'Expiring Docs',        prompt: 'What documents are expiring soon?' },
-    { emoji: '🎯', label: "Ramesh's Schemes",     prompt: 'What schemes does Ramesh qualify for?' },
-    { emoji: '🚀', label: 'Plan SCSS for Suresh', prompt: 'Plan the SCSS application for Suresh' },
-    { emoji: '📑', label: 'Ayushman Checklist',   prompt: 'What documents are needed for Ayushman Vay Vandana?' },
-    { emoji: '👨‍👩‍👧‍👦', label: 'Family List',          prompt: 'List all family members' },
-    { emoji: '📅', label: 'Upcoming Tasks',       prompt: 'What tasks are coming up in the next 30 days?' },
+  $: briefLabel = $activePersona && $activePersona !== 'all' ? `Brief for ${$activePersona}` : 'Morning Briefing';
+  $: briefPrompt = $activePersona && $activePersona !== 'all' ? `Give me the morning briefing for ${$activePersona}` : 'Give me the full family briefing';
+
+  $: targetElder = $activePersona && ['chandler', 'amy', 'justin'].includes($activePersona.toLowerCase()) ? $activePersona : 'Chandler';
+
+  $: chips = [
+    { emoji: '📋', label: briefLabel,                   prompt: briefPrompt },
+    { emoji: '⏳', label: 'Expiring Docs',              prompt: 'What documents are expiring soon?' },
+    { emoji: '🎯', label: `${targetElder}'s Schemes`,   prompt: `What schemes does ${targetElder} qualify for?` },
+    { emoji: '🚀', label: `Plan SCSS for ${targetElder}`, prompt: `Plan the SCSS application for ${targetElder}` },
+    { emoji: '📑', label: 'Ayushman Checklist',         prompt: 'What documents are needed for Ayushman Vay Vandana?' },
+    { emoji: '👨‍👩‍👧‍👦', label: 'Family List',                prompt: 'List all family members' },
+    { emoji: '📅', label: 'Upcoming Tasks',             prompt: 'What tasks are coming up in the next 30 days?' },
   ];
 </script>
 

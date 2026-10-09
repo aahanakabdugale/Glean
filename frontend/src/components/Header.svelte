@@ -1,5 +1,5 @@
 <script>
-  import { theme, toggleTheme, connectionStatus, activeView } from '../lib/store.js';
+  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList } from '../lib/store.js';
 </script>
 
 <header class="header">
@@ -26,6 +26,51 @@
       <span class="tagline">Your family's paperwork, gathered.</span>
     </div>
   </button>
+
+  <!-- "Who am I?" Persona Selector Dropdown -->
+  <div class="persona-selector" title="Select active family member for personalized briefing">
+    <label for="persona-select" class="persona-label">
+      <span class="persona-avatar" aria-hidden="true">
+        {#if $activePersona === 'all'}
+          👨‍👩‍👧‍👦
+        {:else if $activePersona.toLowerCase() === 'chandler' || $activePersona.toLowerCase().includes('grandpa')}
+          👴
+        {:else if $activePersona.toLowerCase() === 'amy' || $activePersona.toLowerCase().includes('grandma')}
+          👵
+        {:else if $activePersona.toLowerCase() === 'justin' || $activePersona.toLowerCase().includes('dad')}
+          👨
+        {:else if $activePersona.toLowerCase() === 'riley' || $activePersona.toLowerCase().includes('mom')}
+          👩
+        {:else if $activePersona.toLowerCase() === 'jace'}
+          👦
+        {:else if $activePersona.toLowerCase() === 'gwen'}
+          👧
+        {:else}
+          👤
+        {/if}
+      </span>
+      <span class="persona-tag">Who am I:</span>
+    </label>
+    <select
+      id="persona-select"
+      class="persona-select"
+      bind:value={$activePersona}
+      aria-label="Select persona: Who am I?"
+    >
+      <option value="all">Whole Family (Overview)</option>
+      <option value="Chandler">Chandler (Grandfather / 70+)</option>
+      <option value="Amy">Amy (Grandmother / 70+)</option>
+      <option value="Justin">Justin (Father / 50s)</option>
+      <option value="Riley">Riley (Mother / 50s)</option>
+      <option value="Jace">Jace (Son / Admin)</option>
+      <option value="Gwen">Gwen (Daughter / Admin)</option>
+      {#each $familyMembersList as m}
+        {#if !['chandler', 'amy', 'justin', 'riley', 'jace', 'gwen'].includes(m.name.toLowerCase())}
+          <option value={m.name}>{m.name} ({m.relation})</option>
+        {/if}
+      {/each}
+    </select>
+  </div>
 
   <!-- Right-hand controls -->
   <div class="controls">
@@ -171,6 +216,65 @@
     font-weight: 400;
     letter-spacing: 0.01em;
     white-space: nowrap;
+  }
+
+  /* Persona Selector ("Who am I?") */
+  .persona-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-full);
+    padding: 3px 10px 3px 10px;
+    transition: var(--theme-transition);
+  }
+
+  .persona-selector:hover,
+  .persona-selector:focus-within {
+    border-color: var(--violet);
+    background: var(--violet-bg);
+  }
+
+  .persona-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .persona-avatar {
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  .persona-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .persona-select {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    padding: 2px 2px;
+  }
+
+  .persona-select option {
+    background: var(--surface);
+    color: var(--text);
   }
 
   .controls {
