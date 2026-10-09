@@ -109,3 +109,27 @@ export function clearMessages() {
 // ---------- VIEW --------------------------------------------
 // 'chat' | 'dashboard' | 'settings'
 export const activeView = writable('chat');
+
+// ---------- ACTIVE PERSONA ("Who am I?") ----------------------
+// 'all' | member name / persona label (e.g. 'Aman', 'Grandma', 'Dad', 'Ramesh')
+function initPersona() {
+  const saved = localStorage.getItem('glean-active-persona');
+  return saved || 'all';
+}
+
+export const activePersona = writable(initPersona());
+
+activePersona.subscribe(p => {
+  localStorage.setItem('glean-active-persona', p);
+});
+
+// Cache of registered family members used to populate the persona dropdown
+export const familyMembersList = writable([
+  { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'retired' },
+  { name: 'Amy',      relation: 'grandmother', birthYear: 1953, status: 'retired' },
+  { name: 'Justin',   relation: 'father',      birthYear: 1968, status: 'employed' },
+  { name: 'Riley',    relation: 'mother',      birthYear: 1972, status: 'employed' },
+  { name: 'Jace',     relation: 'son',         birthYear: 2000, status: 'family admin' },
+  { name: 'Gwen',     relation: 'daughter',    birthYear: 2003, status: 'family admin' },
+]);
+

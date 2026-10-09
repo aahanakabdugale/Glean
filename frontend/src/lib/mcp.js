@@ -56,12 +56,13 @@ async function callTool(toolName, toolArgs = {}) {
 // resultType tells the UI which rich renderer to use.
 // resultData is a parsed JS object for structured display.
 
-export async function callFamilyBrief() {
-  const raw = await callTool('family_brief');
+export async function callFamilyBrief(memberName = '') {
+  const args = memberName && memberName !== 'all' ? { member_name: memberName } : {};
+  const raw = await callTool('family_brief', args);
   if (raw.ok) {
     return { ...raw, resultType: 'family_brief', resultData: parseFamilyBrief(raw.text) };
   }
-  const demo = demoFamilyBrief();
+  const demo = demoFamilyBrief(memberName);
   return { ok: true, text: demo.text, isLive: false, ms: 0,
            resultType: 'family_brief', resultData: demo.data };
 }
@@ -249,8 +250,12 @@ function parseFamilyMembers(text) {
 
 function demoExpiringDocs() {
   const data = [
-    { member: 'Ramesh', docType: 'Passport', expiryDate: '2026-10-14', statusText: 'URGENT, 6 days left', daysLeft: 6, urgency: 'urgent' },
-    { member: 'Maria',  docType: 'Driving Licence', expiryDate: '2026-10-28', statusText: '20 days left', daysLeft: 20, urgency: 'soon' },
+    { member: 'Chandler', docType: 'Passport', expiryDate: '2026-10-15', statusText: 'URGENT, 6 days left', daysLeft: 6, urgency: 'urgent' },
+    { member: 'Justin',   docType: 'Motor Vehicle Insurance', expiryDate: '2026-10-21', statusText: 'URGENT, 12 days left', daysLeft: 12, urgency: 'urgent' },
+    { member: 'Gwen',     docType: 'University Transit Pass', expiryDate: '2026-10-24', statusText: '15 days left', daysLeft: 15, urgency: 'soon' },
+    { member: 'Amy',      docType: 'Pension Verification Certificate', expiryDate: '2026-10-27', statusText: '18 days left', daysLeft: 18, urgency: 'soon' },
+    { member: 'Justin',   docType: 'Driving Licence', expiryDate: '2026-10-31', statusText: '22 days left', daysLeft: 22, urgency: 'soon' },
+    { member: 'Riley',    docType: 'Health Insurance Policy', expiryDate: '2026-11-06', statusText: '28 days left', daysLeft: 28, urgency: 'soon' },
   ];
   return {
     text: data.map(d => `${d.member}'s ${d.docType} - ${d.expiryDate} (${d.statusText})`).join('\n'),
@@ -260,8 +265,8 @@ function demoExpiringDocs() {
 
 function demoUpcomingTasks() {
   const data = [
-    { title: "Renew Ramesh's passport appointment", member: 'Ramesh', dueDate: '2026-10-12', statusText: '4 days left', overdue: false },
-    { title: 'Collect electricity bill receipt',    member: 'Suresh', dueDate: '2026-10-18', statusText: '10 days left', overdue: false },
+    { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: '2026-10-13', statusText: '4 days left', overdue: false },
+    { title: 'Check Ayushman & senior benefits',     member: 'Chandler', dueDate: '2026-10-17', statusText: '8 days left', overdue: false },
   ];
   return {
     text: data.map(t => `${t.title} (${t.member}) - ${t.dueDate} (${t.statusText})`).join('\n'),
@@ -308,20 +313,26 @@ function demoPlan(name, scheme) {
   };
 }
 
-function demoFamilyBrief() {
-  const text = `Family Briefing (4 family members tracked):\n\nExpiring Documents (next 30 days): 2\n• Ramesh's Passport: 2026-10-14 (urgent, 6d left)\n• Maria's Driving Licence: 2026-10-28 (20d left)\n\nUpcoming Tasks (next 14 days): 1\n• Renew Ramesh's passport appointment (Ramesh) — due 2026-10-12 (4d left)`;
+function demoFamilyBrief(memberName = '') {
+  if (memberName && memberName !== 'all') {
+    const text = `Personal Briefing for ${memberName}:\n\nYour Expiring Documents (next 30 days): 1\n• Passport: 2026-10-15 (urgent (6d left))\n\nYour Upcoming Deadlines (next 14 days): 1\n• Renew passport appointment — due 2026-10-13 (4d left)\n\nGovernment Benefits You May Qualify For:\n• Ayushman Vay Vandana Card (AB PM-JAY)\n• Senior Citizens Savings Scheme (SCSS)\nAsk me 'Plan the application' or 'What documents are needed' anytime!`;
+    return { text, data: { raw: text, expiringCount: 1, tasksCount: 1 } };
+  }
+  const text = `Family Briefing (6 family members tracked):\n\nExpiring Documents (next 30 days): 2\n• Chandler's Passport: 2026-10-15 (urgent, 6d left)\n• Justin's Driving Licence: 2026-10-29 (20d left)\n\nUpcoming Tasks (next 14 days): 1\n• Renew Chandler's passport appointment (Chandler) — due 2026-10-13 (4d left)`;
   return { text, data: { raw: text, expiringCount: 2, tasksCount: 1 } };
 }
 
 function demoMembersText() {
-  return `Ramesh (grandfather) — born 1950, retired\nSuresh (father) — born 1966, employed\nSunita (mother) — born 1970, homemaker\nMaria (daughter) — born 2005, student`;
+  return `Chandler (grandfather) — born 1950, retired\nAmy (grandmother) — born 1953, retired\nJustin (father) — born 1968, employed\nRiley (mother) — born 1972, employed\nJace (son) — born 2000, family admin\nGwen (daughter) — born 2003, family admin`;
 }
 
 function demoMembersData() {
   return [
-    { name: 'Ramesh', relation: 'grandfather', birthYear: 1950, status: 'retired' },
-    { name: 'Suresh', relation: 'father',      birthYear: 1966, status: 'employed' },
-    { name: 'Sunita', relation: 'mother',       birthYear: 1970, status: 'homemaker' },
-    { name: 'Maria',  relation: 'daughter',     birthYear: 2005, status: 'student' },
+    { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'retired' },
+    { name: 'Amy',      relation: 'grandmother', birthYear: 1953, status: 'retired' },
+    { name: 'Justin',   relation: 'father',      birthYear: 1968, status: 'employed' },
+    { name: 'Riley',    relation: 'mother',      birthYear: 1972, status: 'employed' },
+    { name: 'Jace',     relation: 'son',         birthYear: 2000, status: 'family admin' },
+    { name: 'Gwen',     relation: 'daughter',    birthYear: 2003, status: 'family admin' },
   ];
 }
