@@ -136,6 +136,34 @@
       font-weight: 500;
     }
 
+    .persona-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.74rem;
+      padding: 4px 10px;
+      border-radius: 30px;
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      color: var(--text-main);
+    }
+
+    .persona-pill select {
+      background: transparent;
+      border: none;
+      color: var(--alexa-cyan);
+      font-family: inherit;
+      font-size: 0.76rem;
+      font-weight: 600;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .persona-pill select option {
+      background: #0f172a;
+      color: #f8fafc;
+    }
+
     .status-badge.offline {
       background: rgba(245, 158, 11, 0.1);
       border-color: rgba(245, 158, 11, 0.3);
@@ -548,6 +576,18 @@
       </div>
 
       <div class="header-controls">
+        <div class="persona-pill" title="Select active family member for personalized briefing">
+          <span>👤 Who am I:</span>
+          <select id="personaSelect">
+            <option value="all">Whole Family</option>
+            <option value="Chandler">Chandler (Grandfather / 70+)</option>
+            <option value="Amy">Amy (Grandmother / 70+)</option>
+            <option value="Justin">Justin (Father / 50s)</option>
+            <option value="Riley">Riley (Mother / 50s)</option>
+            <option value="Jace">Jace (Son / Admin)</option>
+            <option value="Gwen">Gwen (Daughter / Admin)</option>
+          </select>
+        </div>
         <div id="statusBadge" class="status-badge">
           <span class="status-dot"></span>
           <span id="statusText">Demo (Local Engine)</span>
@@ -589,8 +629,8 @@
           Try asking:
           <div class="highlight-card">
             • <em>"What documents are expiring soon?"</em><br>
-            • <em>"What schemes does Ramesh qualify for?"</em><br>
-            • <em>"Plan the Senior Citizens Savings Scheme application for Suresh"</em><br>
+            • <em>"What schemes does Chandler qualify for?"</em><br>
+            • <em>"Plan the Senior Citizens Savings Scheme application for Chandler"</em><br>
             • <em>"Give me the family morning briefing"</em>
           </div>
         </div>
@@ -605,11 +645,11 @@
       <div class="chip" onclick="sendPrompt('What documents are expiring soon?')">
         ⏳ Expiring Documents
       </div>
-      <div class="chip" onclick="sendPrompt('What schemes does Ramesh qualify for?')">
-        🎯 Check Ramesh's Schemes
+      <div class="chip" onclick="sendPrompt('What schemes does Chandler qualify for?')">
+        🎯 Check Chandler's Schemes
       </div>
-      <div class="chip" onclick="sendPrompt('Plan the SCSS application for Suresh')">
-        🚀 Plan SCSS for Suresh
+      <div class="chip" onclick="sendPrompt('Plan the SCSS application for Chandler')">
+        🚀 Plan SCSS for Chandler
       </div>
       <div class="chip" onclick="sendPrompt('What documents are needed for Ayushman Vay Vandana?')">
         📑 Ayushman Checklist
@@ -651,19 +691,47 @@
     // Built-in Demo Data State (Used when local FastMCP server is not connected)
     const mockState = {
       family: [
-        { name: "Ramesh", relation: "grandfather", birth_year: 1950, status: "retired" },
-        { name: "Suresh", relation: "father", birth_year: 1966, status: "employed" },
-        { name: "Sunita", relation: "mother", birth_year: 1970, status: "homemaker" },
-        { name: "Maria", relation: "daughter", birth_year: 2005, status: "student" }
+        { name: "Chandler", relation: "grandfather", birth_year: 1950, status: "retired" },
+        { name: "Amy",      relation: "grandmother", birth_year: 1953, status: "retired" },
+        { name: "Justin",   relation: "father",      birth_year: 1968, status: "employed" },
+        { name: "Riley",    relation: "mother",      birth_year: 1972, status: "employed" },
+        { name: "Jace",     relation: "son",         birth_year: 2000, status: "family admin" },
+        { name: "Gwen",     relation: "daughter",    birth_year: 2003, status: "family admin" }
       ],
       documents: [
-        { member: "Ramesh", type: "Passport", expiry: "2026-10-14" }, // 7 days left
-        { member: "Maria", type: "Driving Licence", expiry: "2026-10-28" }, // 21 days left
-        { member: "Sunita", type: "Aadhaar Card", expiry: "2030-01-01" }
+        // Chandler (Grandfather)
+        { member: "Chandler", type: "Passport", expiry: "2026-10-15" }, // 6 days left (urgent)
+        { member: "Chandler", type: "Senior Citizen Health Insurance", expiry: "2026-11-03" }, // 25 days left
+        { member: "Chandler", type: "Fixed Deposit Scheme Certificate", expiry: "2027-04-07" },
+
+        // Amy (Grandmother)
+        { member: "Amy", type: "Pension Life Verification Certificate", expiry: "2026-10-27" }, // 18 days left
+        { member: "Amy", type: "Ayushman Vay Vandana Health Card", expiry: "2027-10-09" },
+        { member: "Amy", type: "Post Office Senior Savings Certificate", expiry: "2027-11-13" },
+
+        // Justin (Father)
+        { member: "Justin", type: "Motor Vehicle Comprehensive Insurance", expiry: "2026-10-21" }, // 12 days left
+        { member: "Justin", type: "Driving Licence", expiry: "2026-10-31" }, // 22 days left
+        { member: "Justin", type: "Passport", expiry: "2028-10-28" },
+
+        // Riley (Mother)
+        { member: "Riley", type: "Health Insurance Policy", expiry: "2026-11-06" }, // 28 days left
+        { member: "Riley", type: "Professional Membership Card", expiry: "2027-02-06" },
+        { member: "Riley", type: "Driving Licence", expiry: "2028-02-21" },
+
+        // Jace (Son / Admin)
+        { member: "Jace", type: "Passport", expiry: "2027-01-07" },
+        { member: "Jace", type: "Term Life Insurance Policy", expiry: "2027-08-05" },
+        { member: "Jace", type: "Driving Licence", expiry: "2028-06-01" },
+
+        // Gwen (Daughter / Admin)
+        { member: "Gwen", type: "University Transit Pass", expiry: "2026-10-24" }, // 15 days left
+        { member: "Gwen", type: "Student Health Insurance", expiry: "2027-01-12" },
+        { member: "Gwen", type: "Passport", expiry: "2028-01-02" }
       ],
       tasks: [
-        { title: "Renew Ramesh's passport appointment", due: "2026-10-12", member: "Ramesh", done: false },
-        { title: "Collect electricity bill receipt", due: "2026-10-18", member: "Suresh", done: false }
+        { title: "Renew Chandler's passport appointment", due: "2026-10-13", member: "Chandler", done: false },
+        { title: "Check Ayushman & senior benefits for Chandler & Amy", due: "2026-10-17", member: "Chandler", done: false }
       ],
       schemes: [
         {
@@ -707,6 +775,7 @@
 
     async function dispatchIntent(prompt) {
       const q = prompt.toLowerCase();
+      const personaVal = document.getElementById("personaSelect") ? document.getElementById("personaSelect").value : "all";
       let toolName = "";
       let toolArgs = {};
       let resultText = "";
@@ -714,8 +783,8 @@
       // 1. Briefing
       if (q.includes("brief") || q.includes("morning") || q.includes("update") || q.includes("summary")) {
         toolName = "family_brief";
-        toolArgs = {};
-        resultText = runLocalFamilyBrief();
+        toolArgs = personaVal !== "all" ? { member_name: personaVal } : {};
+        resultText = runLocalFamilyBrief(personaVal);
       }
       // 2. Expiring Documents
       else if (q.includes("expir") || q.includes("document") && (q.includes("soon") || q.includes("renew") || q.includes("due"))) {
@@ -726,7 +795,10 @@
       // 3. Multi-Step Planning
       else if (q.includes("plan") || q.includes("apply") && q.includes("for")) {
         toolName = "plan_scheme_application";
-        let targetPerson = q.includes("suresh") ? "Suresh" : (q.includes("ramesh") ? "Ramesh" : "Maria");
+        let targetPerson = q.includes("chandler") || q.includes("grandpa") ? "Chandler" :
+                           (q.includes("amy") || q.includes("grandma") ? "Amy" :
+                           (q.includes("justin") || q.includes("dad") ? "Justin" :
+                           (personaVal !== "all" ? personaVal : "Chandler")));
         let targetScheme = q.includes("scss") || q.includes("saving") ? "scss" : (q.includes("ayushman") ? "ayushman_vay_vandana" : "apy");
         toolArgs = { name: targetPerson, scheme: targetScheme, days_to_prepare: 7 };
         resultText = runLocalPlanScheme(targetPerson, targetScheme, 7);
@@ -734,7 +806,10 @@
       // 4. Scheme Eligibility Check
       else if (q.includes("scheme") || q.includes("qualif") || q.includes("benefit") || q.includes("eligible")) {
         toolName = "check_scheme_eligibility";
-        let targetPerson = q.includes("suresh") ? "Suresh" : (q.includes("ramesh") ? "Ramesh" : "Sunita");
+        let targetPerson = q.includes("chandler") || q.includes("grandpa") ? "Chandler" :
+                           (q.includes("amy") || q.includes("grandma") ? "Amy" :
+                           (q.includes("justin") || q.includes("dad") ? "Justin" :
+                           (personaVal !== "all" ? personaVal : "Chandler")));
         toolArgs = { name: targetPerson, tags: "" };
         resultText = runLocalEligibility(targetPerson);
       }
@@ -760,8 +835,8 @@
       // Default Fallback
       else {
         toolName = "family_brief";
-        toolArgs = {};
-        resultText = "Here's what I have on your family paperwork right now:\n\n" + runLocalFamilyBrief();
+        toolArgs = personaVal !== "all" ? { member_name: personaVal } : {};
+        resultText = "Here's what I have on your paperwork right now:\n\n" + runLocalFamilyBrief(personaVal);
       }
 
       // Try sending to real MCP server if configured
@@ -777,7 +852,21 @@
     // Local Simulation Functions (Matching exact FastMCP logic)
     // -------------------------------------------------------------------------
 
-    function runLocalFamilyBrief() {
+    function runLocalFamilyBrief(persona = "all") {
+      if (persona && persona !== "all") {
+        return `Personal Briefing for ${persona}:
+
+Your Expiring Documents (next 30 days): 1
+• Passport: 2026-10-14 (urgent, 6d left)
+
+Your Upcoming Deadlines (next 14 days): 1
+• Renew passport appointment — due 2026-10-12 (4d left)
+
+Government Benefits You May Qualify For:
+• Ayushman Vay Vandana Card (AB PM-JAY)
+• Senior Citizens Savings Scheme (SCSS)
+Ask me 'Plan the application' or 'What documents are needed' anytime!`;
+      }
       return `Family Briefing (${mockState.family.length} family members tracked):
 
 Expiring Documents (next 30 days): 2
