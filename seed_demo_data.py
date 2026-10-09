@@ -33,19 +33,19 @@ def seed(reset: bool = False):
 
     # Base dates dynamically around today
     today = datetime.date.today()
-    passport_expiry = (today + datetime.timedelta(days=6)).isoformat()
-    licence_expiry = (today + datetime.timedelta(days=20)).isoformat()
-    health_expiry = (today + datetime.timedelta(days=180)).isoformat()
-
     task1_due = (today + datetime.timedelta(days=4)).isoformat()
     task2_due = (today + datetime.timedelta(days=10)).isoformat()
 
     # 1. Family Members
+    # Chandler (Grandfather), Amy (Grandmother), Justin (Father), Riley (Mother),
+    # Jace (Son / Admin), Gwen (Daughter / Admin)
     members = [
-        ("Ramesh", "grandfather", 1950, "retired"),
-        ("Suresh", "father", 1966, "employed"),
-        ("Sunita", "mother", 1970, "homemaker"),
-        ("Maria", "daughter", 2005, "student"),
+        ("Chandler", "grandfather", 1950, "retired"),
+        ("Amy", "grandmother", 1953, "retired"),
+        ("Justin", "father", 1968, "employed"),
+        ("Riley", "mother", 1972, "employed"),
+        ("Jace", "son", 2000, "family admin"),
+        ("Gwen", "daughter", 2003, "family admin"),
     ]
 
     member_ids = {}
@@ -56,11 +56,38 @@ def seed(reset: bool = False):
         )
         member_ids[name] = cur.lastrowid
 
-    # 2. Documents (never store document numbers, only type and expiry)
+    # 2. Documents: exactly 3 documents per person (6 * 3 = 18 documents)
+    # Strictly never store document numbers — only type and ISO expiry date.
     documents = [
-        (member_ids["Ramesh"], "Passport", passport_expiry),
-        (member_ids["Maria"], "Driving Licence", licence_expiry),
-        (member_ids["Suresh"], "Health Insurance Card", health_expiry),
+        # Chandler (Grandfather)
+        (member_ids["Chandler"], "Passport", (today + datetime.timedelta(days=6)).isoformat()),
+        (member_ids["Chandler"], "Senior Citizen Health Insurance", (today + datetime.timedelta(days=25)).isoformat()),
+        (member_ids["Chandler"], "Fixed Deposit Scheme Certificate", (today + datetime.timedelta(days=180)).isoformat()),
+
+        # Amy (Grandmother)
+        (member_ids["Amy"], "Ayushman Vay Vandana Health Card", (today + datetime.timedelta(days=365)).isoformat()),
+        (member_ids["Amy"], "Post Office Senior Savings Certificate", (today + datetime.timedelta(days=400)).isoformat()),
+        (member_ids["Amy"], "Pension Life Verification Certificate", (today + datetime.timedelta(days=18)).isoformat()),
+
+        # Justin (Father)
+        (member_ids["Justin"], "Driving Licence", (today + datetime.timedelta(days=22)).isoformat()),
+        (member_ids["Justin"], "Motor Vehicle Comprehensive Insurance", (today + datetime.timedelta(days=12)).isoformat()),
+        (member_ids["Justin"], "Passport", (today + datetime.timedelta(days=750)).isoformat()),
+
+        # Riley (Mother)
+        (member_ids["Riley"], "Health Insurance Policy", (today + datetime.timedelta(days=28)).isoformat()),
+        (member_ids["Riley"], "Driving Licence", (today + datetime.timedelta(days=500)).isoformat()),
+        (member_ids["Riley"], "Professional Membership Card", (today + datetime.timedelta(days=120)).isoformat()),
+
+        # Jace (Son / Admin)
+        (member_ids["Jace"], "Passport", (today + datetime.timedelta(days=90)).isoformat()),
+        (member_ids["Jace"], "Driving Licence", (today + datetime.timedelta(days=600)).isoformat()),
+        (member_ids["Jace"], "Term Life Insurance Policy", (today + datetime.timedelta(days=300)).isoformat()),
+
+        # Gwen (Daughter / Admin)
+        (member_ids["Gwen"], "University Transit Pass", (today + datetime.timedelta(days=15)).isoformat()),
+        (member_ids["Gwen"], "Passport", (today + datetime.timedelta(days=450)).isoformat()),
+        (member_ids["Gwen"], "Student Health Insurance", (today + datetime.timedelta(days=95)).isoformat()),
     ]
 
     for m_id, doc_type, expiry in documents:
@@ -71,8 +98,10 @@ def seed(reset: bool = False):
 
     # 3. Tasks
     tasks = [
-        ("Renew Ramesh's passport appointment", task1_due, member_ids["Ramesh"]),
-        ("Check senior citizen pension documents", task2_due, member_ids["Ramesh"]),
+        ("Renew Chandler's passport appointment", task1_due, member_ids["Chandler"]),
+        ("Check Ayushman & senior benefits for Chandler & Amy", task2_due, member_ids["Chandler"]),
+        ("Vehicle insurance renewal check", (today + datetime.timedelta(days=14)).isoformat(), member_ids["Justin"]),
+        ("Submit Amy's annual pension life certificate", (today + datetime.timedelta(days=16)).isoformat(), member_ids["Amy"]),
     ]
 
     for title, due, m_id in tasks:
@@ -83,13 +112,12 @@ def seed(reset: bool = False):
 
     conn.commit()
     print("Successfully seeded demo data:")
-    print(f"  - 4 Family members: {', '.join(member_ids.keys())}")
-    print(f"  - 3 Documents: Ramesh Passport (exp: {passport_expiry}), Maria Licence (exp: {licence_expiry}), Suresh Insurance")
-    print(f"  - 2 Tasks: Passport renewal (due: {task1_due}), Pension check (due: {task2_due})")
+    print(f"  - 6 Family members: {', '.join(member_ids.keys())} (Admins: Jace, Gwen)")
+    print(f"  - 18 Documents: 3 documents seeded for each of the 6 family members")
+    print(f"  - 4 Tasks seeded across upcoming deadlines")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed demo data for Glean")
-    parser.add_argument("--reset", action="store_true", help="Clear existing data before seeding")
-    args = parser.parse_args()
-    seed(reset=args.reset)
+    parser.parse_args()
+    seed(reset=True)
