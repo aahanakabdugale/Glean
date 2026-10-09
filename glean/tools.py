@@ -376,13 +376,127 @@ def plan_scheme_application(name: str, scheme: str, days_to_prepare: int = 7) ->
 
 
 @mcp.tool()
-def family_brief() -> str:
-    """Provide a comprehensive spoken-style summary of family paperwork:
-    expiring documents, upcoming deadlines, and pending tasks."""
+def family_brief(member_name: str = "") -> str:
+    """Provide a comprehensive spoken-style summary of paperwork, deadlines, and benefits.
+    If member_name is specified (e.g. 'Aman', 'Grandma', 'Dad', 'Ramesh'),
+    tailors the briefing personally for that individual including their documents,
+    deadlines, and qualifying government schemes. If omitted or 'all', provides the whole-family briefing."""
     today = datetime.date.today()
     cutoff_docs = today + datetime.timedelta(days=30)
     cutoff_tasks = today + datetime.timedelta(days=14)
 
+    target = member_name.strip()
+    if target and target.lower() not in ("all", "everyone", "family"):
+        # Personalised briefing
+        try:
+            conn = db.get_connection()
+            # 1. Search member by name (case-insensitive)
+            member = conn.execute(
+                "SELECT id, name, relation, birth_year, status FROM family_members WHERE LOWER(name) = ?",
+                (target.lower(),),
+            ).fetchone()
+
+            # 2. If not found by name, try matching by relation or common alias
+            if not member:
+                alias_map = {
+                    "grandpa": "grandfather",
+                    "granddad": "grandfather",
+                    "dada": "grandfather",
+                    "nana": "grandfather",
+                    "grandma": "grandmother",
+                    "granny": "grandmother",
+                    "dadi": "grandmother",
+                    "nani": "grandmother",
+                    "dad": "father",
+                    "papa": "father",
+                    "mom": "mother",
+                    "mummy": "mother",
+                    "maa": "mother",
+                    "admin": "admin",
+                }
+                normalized_target = alias_map.get(target.lower(), target.lower())
+                member = conn.execute(
+                    "SELECT id, name, relation, birth_year, status FROM family_members "
+                    "WHERE LOWER(relation) LIKE ? OR LOWER(name) LIKE ?",
+                    (f"%{normalized_target}%", f"%{target.lower()}%"),
+                ).fetchone()
+
+            if not member:
+                return (
+                    f"I don't have records for '{target}' yet. "
+                    "Add them to your family list first, or ask for the whole-family briefing."
+                )
+
+            m_id = member["id"]
+            m_name = member["name"]
+            m_relation = member["relation"]
+            m_birth = member["birth_year"]
+
+            # Member's expiring documents
+            exp_docs = conn.execute(
+                "SELECT doc_type, expiry_date FROM documents "
+                "WHERE member_id = ? AND expiry_date <= ? "
+                "ORDER BY expiry_date",
+                (m_id, cutoff_docs.isoformat()),
+            ).fetchall()
+
+            # Member's upcoming tasks (+ household tasks where member_id is NULL)
+            tasks = conn.execute(
+                "SELECT title, due_date, member_id FROM tasks "
+                "WHERE (member_id = ? OR member_id IS NULL) AND done = 0 AND due_date <= ? "
+                "ORDER BY due_date",
+                (m_id, cutoff_tasks.isoformat()),
+            ).fetchall()
+
+            # Scheme eligibility evaluation
+            eligibility = schemes.check_eligibility(m_birth)
+            eligible_schemes = [s for s in eligibility if s["status"] == "may_be_eligible"]
+            verify_schemes = [s for s in eligibility if s["status"] == "check_needed"]
+
+        except Exception as exc:
+            logger.error("family_brief personalized failed: %s", exc)
+            return "Something went wrong. Please try again."
+
+        lines = [f"Personal Briefing for {m_name} ({m_relation}, born {m_birth}):"]
+
+        # Documents
+        if exp_docs:
+            lines.append(f"\nYour Expiring Documents (next 30 days): {len(exp_docs)}")
+            for r in exp_docs:
+                exp = datetime.date.fromisoformat(r["expiry_date"])
+                left = (exp - today).days
+                urgency = "EXPIRED" if left < 0 else (f"urgent ({left}d left)" if left <= 7 else f"{left}d left")
+                lines.append(f"• {r['doc_type']}: {r['expiry_date']} ({urgency})")
+        else:
+            lines.append("\nDocuments: All your documents are up to date for the next 30 days.")
+
+        # Tasks
+        if tasks:
+            lines.append(f"\nYour Upcoming Deadlines (next 14 days): {len(tasks)}")
+            for r in tasks:
+                due = datetime.date.fromisoformat(r["due_date"])
+                left = (due - today).days
+                status = "OVERDUE" if left < 0 else ("due today" if left == 0 else f"{left}d left")
+                scope = " (household)" if r["member_id"] is None else ""
+                lines.append(f"• {r['title']}{scope} — due {r['due_date']} ({status})")
+        else:
+            lines.append("\nTasks: No deadlines due for you in the next 14 days.")
+
+        # Government schemes
+        if eligible_schemes:
+            lines.append("\nGovernment Benefits You May Qualify For:")
+            for s in eligible_schemes:
+                lines.append(f"• {s['name']} (Official link: {s['source_url']})")
+            lines.append("Ask me 'Plan the application' or 'What documents are needed' anytime!")
+        elif verify_schemes:
+            lines.append("\nPotential Benefits (verification needed):")
+            for s in verify_schemes:
+                confirm = "; ".join(s["confirm"])
+                lines.append(f"• {s['name']} — confirm: {confirm}")
+
+        return "\n".join(lines)
+
+    # Whole-family briefing
     try:
         conn = db.get_connection()
         members = conn.execute("SELECT COUNT(*) FROM family_members").fetchone()[0]

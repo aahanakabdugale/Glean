@@ -693,3 +693,35 @@ def test_family_brief_all_clear(db_conn):
     result = family_brief()
     assert "Family Briefing (1 family member tracked):" in result
     assert "Everything looks great!" in result
+
+
+def test_family_brief_personalized_happy_path(db_conn):
+    """Personalized brief for a member shows their specific docs, deadlines, and benefits."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    add_family_member("Maria", "daughter", 2005, "student")
+    expiry = (_dt.date.today() + _dt.timedelta(days=4)).isoformat()
+    add_document("Senior Health Card", "Ramesh", expiry)
+    due = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    add_task("Schedule cataract checkup", due, "Ramesh")
+
+    result = family_brief(member_name="Ramesh")
+    assert "Personal Briefing for Ramesh (grandfather, born 1950):" in result
+    assert "Senior Health Card" in result
+    assert "Schedule cataract checkup" in result
+    # Ramesh is 70+, so Ayushman or SCSS is detected
+    assert "Government Benefits You May Qualify For:" in result
+
+
+def test_family_brief_personalized_relation_alias(db_conn):
+    """Passing a relation alias like 'grandpa' matches grandfather Ramesh."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    result = family_brief(member_name="grandpa")
+    assert "Personal Briefing for Ramesh (grandfather, born 1950):" in result
+
+
+def test_family_brief_personalized_unknown(db_conn):
+    """Unknown person returns friendly guidance."""
+    add_family_member("Ramesh", "grandfather", 1950, "retired")
+    result = family_brief(member_name="UnknownPerson")
+    assert "I don't have records for 'UnknownPerson' yet." in result
+
