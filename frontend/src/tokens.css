@@ -1,0 +1,139 @@
+/* ============================================================
+   GLEAN VOICE RING DESIGN TOKENS
+   All visual variables live here. Components use var(--token).
+   ============================================================ */
+
+:root, [data-theme="light"] {
+  --bg: #FFFFFF;
+  --bg-glow: radial-gradient(620px 420px at 50% 38%, #E8F0FE 0%, #FFFFFF 72%);
+  --surface: #FFFFFF;
+  --surface-2: #E8F0FE;
+  --text: #202124;
+  --text-muted: #5F6368;
+  --text-soft: #3C4043;
+  --line: #DADCE0;
+  --line-soft: #E8EAED;
+  --accent: #4285F4;
+  --accent-2: #1A73E8;
+  --accent-deep: #174EA6;
+  --orb: radial-gradient(circle at 32% 26%, #AECBFA, #4285F4 45%, #1A73E8 76%, #174EA6);
+  --orb-rings: 0 0 0 14px rgba(66,133,244,.14), 0 0 0 32px rgba(66,133,244,.08), 0 0 0 54px rgba(66,133,244,.04), 0 0 70px rgba(66,133,244,.45);
+  --urgent: #EA4335;
+  --urgent-bg: #FCE8E6;
+  --urgent-text: #C5221F;
+  --soon: #FBBC05;
+  --soon-bg: #FEF7E0;
+  --soon-text: #B06000;
+  --ok: #34A853;
+  --ok-bg: #E6F4EA;
+  --ok-text: #137333;
+  --info: #4285F4;
+  --info-bg: #E8F0FE;
+  --info-text: #1967D2;
+  --shadow-card: 0 1px 3px rgba(60,64,67,.22);
+  --shadow-pop: 0 8px 24px rgba(60,64,67,.20);
+  --caption-em: #EA4335;
+  --btn-primary-text: #FFFFFF;
+  --badge-urgent-color: var(--urgent-text);
+  --badge-soon-color: var(--soon-text);
+  --badge-ok-color: var(--ok-text);
+  --badge-info-color: var(--info-text);
+  --badge-neutral-bg: var(--line-soft);
+  --badge-neutral-color: var(--text-soft);
+}
+
+[data-theme="dark"] {
+  --bg: #05070D;
+  --bg-glow: radial-gradient(620px 420px at 50% 38%, #0B2A55 0%, #05070D 72%);
+  --surface: #0C1424;
+  --surface-2: #122238;
+  --text: #E8F4FF;
+  --text-muted: #7F9BB8;
+  --text-soft: #B8D6EE;
+  --line: rgba(255,255,255,.22);
+  --line-soft: rgba(255,255,255,.10);
+  --accent: #00CAFF;
+  --accent-2: #2A6CFF;
+  --accent-deep: #1B2B8F;
+  --orb: radial-gradient(circle at 35% 30%, #8CF5FF, #00CAFF 35%, #2A6CFF 72%, #1B2B8F);
+  --orb-rings: 0 0 0 14px rgba(0,202,255,.13), 0 0 0 32px rgba(0,202,255,.07), 0 0 0 54px rgba(0,202,255,.035), 0 0 90px rgba(0,202,255,.5);
+  --urgent: #F28B82;
+  --urgent-bg: rgba(242,139,130,.14);
+  --urgent-text: #F28B82;
+  --soon: #FDD663;
+  --soon-bg: rgba(253,214,99,.14);
+  --soon-text: #FDD663;
+  --ok: #81C995;
+  --ok-bg: rgba(129,201,149,.14);
+  --ok-text: #81C995;
+  --info: #8AB4F8;
+  --info-bg: rgba(138,180,248,.14);
+  --info-text: #8AB4F8;
+  --shadow-card: none;
+  --shadow-pop: 0 12px 32px rgba(0,0,0,.5);
+  --caption-em: #00CAFF;
+  --btn-primary-text: #05070D;
+  --badge-urgent-color: var(--urgent);
+  --badge-soon-color: var(--soon);
+  --badge-ok-color: var(--ok);
+  --badge-info-color: var(--info);
+  --badge-neutral-bg: rgba(255,255,255,.08);
+  --badge-neutral-color: var(--text-soft);
+}
+
+/* ---------- SHARED SCALES (THEME-INDEPENDENT) ---------- */
+:root {
+  /* Typography */
+  --font-ui: 'Outfit Variable', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Roboto Mono', ui-monospace, monospace;
+
+  /* Font sizes & line heights */
+  --fs-caption: 32px;
+  --lh-caption: 1.25;
+  --fs-caption-m: 24px;
+  --fs-h1: 28px;
+  --lh-h1: 1.2;
+  --fs-h2: 20px;
+  --lh-h2: 1.3;
+  --fs-number: 28px;
+  --lh-number: 1.1;
+  --fs-body: 16px;
+  --lh-body: 1.5;
+  --fs-small: 14px;
+  --lh-small: 1.4;
+  --fs-label: 12px;
+  --lh-label: 1.3;
+  --fs-mono: 13px;
+  --lh-mono: 1.5;
+
+  /* Spacing Scale (4px base) */
+  --sp-4: 4px;
+  --sp-8: 8px;
+  --sp-12: 12px;
+  --sp-16: 16px;
+  --sp-24: 24px;
+  --sp-32: 32px;
+  --sp-48: 48px;
+  --sp-64: 64px;
+
+  /* Radii */
+  --r-pill: 999px;
+  --r-card: 16px;
+  --r-sm: 8px;
+  --r-drawer: 24px;
+
+  /* Motion */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
+
+  /* Component Dimensions */
+  --btn-height: 40px;
+  --input-height: 52px;
+  --mic-size: 38px;
+  --chip-height: 34px;
+  --badge-height: 24px;
+  --toggle-w: 44px;
+  --toggle-h: 24px;
+  --drawer-w: 480px;
+}
