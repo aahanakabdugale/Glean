@@ -32,7 +32,7 @@ make.
 I used two separate Crew sessions (treated as independent subagents) in the same
 work block:
 
-- **Session A — schemes tests:** asked to read `glean/schemes.py` and
+- **Session A — schemes tests:** asked to read `backend/schemes.py` and
   `data/schemes.json`, then write `tests/test_schemes_extra.py` covering boundary
   ages, empty/unknown tags, and result shape. It produced 20 new tests. The
   schemes test suite went from **8 tests** (`test_schemes.py`) to **28 tests**
@@ -120,7 +120,7 @@ already knows the project's file layout saved more time than the PATH setup lost
 
 ## 9. Security Review (Kiro-assisted)
 
-Kiro was used to generate `glean/security.py` and `tests/test_security.py` in a
+Kiro was used to generate `backend/security.py` and `tests/test_security.py` in a
 single session. The three helpers and their findings:
 
 - **`validate_token`** — guards the server with a Bearer token checked against

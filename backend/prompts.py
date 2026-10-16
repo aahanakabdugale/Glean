@@ -8,7 +8,7 @@ Claude Desktop, and the MCP Inspector can discover and trigger with typed argume
   - scheme_application_assistant
 """
 
-from glean.app import mcp
+from backend.app import mcp
 
 
 @mcp.prompt(

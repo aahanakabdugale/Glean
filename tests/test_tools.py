@@ -12,8 +12,8 @@ import sqlite3
 
 import pytest
 
-import glean.db as glean_db
-from glean.tools import (
+import backend.db as glean_db
+from backend.tools import (
     add_document,
     add_family_member,
     get_expiring_documents,
@@ -373,7 +373,7 @@ def test_expiring_invalid_days_over_limit(db_conn):
 #   Tests follow the code.
 # ---------------------------------------------------------------------------
 
-from glean.tools import add_task, list_upcoming_tasks
+from backend.tools import add_task, list_upcoming_tasks
 
 
 def _task_count(conn):
@@ -569,7 +569,7 @@ def test_list_tasks_invalid_days_over_limit(db_conn):
 # plan_scheme_application, family_brief
 # ---------------------------------------------------------------------------
 
-from glean.tools import (
+from backend.tools import (
     check_scheme_eligibility,
     get_scheme_checklist,
     plan_scheme_application,

@@ -10,9 +10,9 @@ and the MCP Inspector can read, subscribe to, or attach directly to context:
 """
 
 import json
-from glean import db
-from glean.app import mcp
-from glean.schemes import load_schemes
+from backend import db
+from backend.app import mcp
+from backend.schemes import load_schemes
 
 
 @mcp.resource(

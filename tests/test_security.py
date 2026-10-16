@@ -14,7 +14,7 @@ import os
 
 import pytest
 
-from glean.security import (
+from backend.security import (
     DEFAULT_ALLOWED_ORIGINS,
     sanitize_input,
     validate_origin,

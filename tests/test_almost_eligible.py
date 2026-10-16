@@ -2,13 +2,13 @@ from datetime import date
 import sqlite3
 import pytest
 
-import glean.db as glean_db
-from glean.schemes import (
+import backend.db as glean_db
+from backend.schemes import (
     ALMOST_ELIGIBLE_WINDOW_YEARS,
     check_eligibility,
     load_schemes,
 )
-from glean.tools import check_scheme_eligibility
+from backend.tools import check_scheme_eligibility
 
 TODAY = date(2026, 10, 6)
 

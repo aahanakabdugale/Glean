@@ -12,10 +12,10 @@ from datetime import date, timedelta
 import sqlite3
 import pytest
 
-import glean.db as glean_db
-from glean import schemes
-from glean.security import sanitize_input
-from glean.tools import (
+import backend.db as glean_db
+from backend import schemes
+from backend.security import sanitize_input
+from backend.tools import (
     add_document,
     add_family_member,
     add_task,

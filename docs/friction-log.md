@@ -68,7 +68,7 @@ Honest notes on problems hit while building Glean, and how each was fixed.
 ### 10. Token guard needs to be wired manually into each MCP middleware layer
 - **Tool:** FastMCP (MCP Python SDK v2.3.0)
 - **What happened:** `validate_token` and `validate_origin` are written as
-  standalone helpers in `glean/security.py`. FastMCP's Streamable HTTP transport
+  standalone helpers in `backend/security.py`. FastMCP's Streamable HTTP transport
   does not expose a first-class middleware hook in v2.3.0, so the helpers cannot
   be registered once at startup; they have to be called per-tool or via a wrapping
   Starlette middleware added manually to the uvicorn app.

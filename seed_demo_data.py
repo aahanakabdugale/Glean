@@ -9,7 +9,7 @@ import datetime
 import os
 import sqlite3
 
-from glean import db
+from backend import db
 
 
 def seed(reset: bool = False):

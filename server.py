@@ -29,13 +29,13 @@ from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.staticfiles import StaticFiles
 
-from glean import db
-from glean.app import mcp
-from glean.security import validate_origin, validate_token
+from backend import db
+from backend.app import mcp
+from backend.security import validate_origin, validate_token
 
-import glean.tools      # noqa: F401  — side-effect: registers all 11 tools on mcp
-import glean.resources  # noqa: F401  — side-effect: registers MCP resources on mcp
-import glean.prompts    # noqa: F401  — side-effect: registers MCP prompts on mcp
+import backend.tools      # noqa: F401  — side-effect: registers all 11 tools on mcp
+import backend.resources  # noqa: F401  — side-effect: registers MCP resources on mcp
+import backend.prompts    # noqa: F401  — side-effect: registers MCP prompts on mcp
 
 logger = logging.getLogger(__name__)
 
@@ -129,17 +129,17 @@ def build_app():
     # any MCP processing.
     app.add_middleware(GleanSecurityMiddleware)
 
-    # Locate the built frontend (simulator/dist).
+    # Locate the built frontend (alexa-simulator/dist).
     # Allows judges to run `python server.py` directly without Node.js.
     here = os.path.dirname(os.path.abspath(__file__))
-    dist_dir = os.path.join(here, "simulator", "dist")
+    dist_dir = os.path.join(here, "alexa-simulator", "dist")
 
     if os.path.isdir(dist_dir):
         # Mount built static assets directly on the MCP Starlette app
         app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")
         logger.info("Serving Glean UI from %s", dist_dir)
     else:
-        logger.info("simulator/dist not found — running in pure MCP mode")
+        logger.info("alexa-simulator/dist not found — running in pure MCP mode")
 
     return app
 

@@ -16,7 +16,7 @@ from datetime import date
 
 import pytest
 
-from glean.schemes import check_eligibility
+from backend.schemes import check_eligibility
 
 TODAY = date(2026, 10, 6)
 

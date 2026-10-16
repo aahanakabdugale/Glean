@@ -9,9 +9,9 @@ import json
 import sqlite3
 import pytest
 
-import glean.db as glean_db
-from glean.app import mcp
-import glean.tools  # registers tools, resources, and prompts
+import backend.db as glean_db
+from backend.app import mcp
+import backend.tools  # registers tools, resources, and prompts
 
 
 @pytest.fixture

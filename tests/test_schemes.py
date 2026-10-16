@@ -1,6 +1,6 @@
 from datetime import date
 
-from glean.schemes import age_from_birth_year, check_eligibility, load_schemes
+from backend.schemes import age_from_birth_year, check_eligibility, load_schemes
 
 TODAY = date(2026, 10, 6)  # fixed so tests never break as years pass
 

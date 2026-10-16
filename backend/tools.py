@@ -2,8 +2,8 @@ import datetime
 import logging
 import sqlite3
 
-from glean import db, schemes
-from glean.app import mcp
+from backend import db, schemes
+from backend.app import mcp
 
 logger = logging.getLogger(__name__)
 
@@ -664,5 +664,5 @@ def get_family_dashboard() -> str:
 
 
 # Ensure spec-depth MCP resources and prompts are registered with mcp server
-import glean.resources  # noqa: F401, E402
-import glean.prompts    # noqa: F401, E402
+import backend.resources  # noqa: F401, E402
+import backend.prompts    # noqa: F401, E402

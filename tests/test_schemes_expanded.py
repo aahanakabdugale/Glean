@@ -9,8 +9,8 @@ Tests for Scheme Expansion (4 -> 8 schemes):
 from datetime import date
 import pytest
 
-from glean.schemes import check_eligibility, load_schemes
-from glean.tools import get_scheme_checklist
+from backend.schemes import check_eligibility, load_schemes
+from backend.tools import get_scheme_checklist
 
 TODAY = date(2026, 10, 6)
 
