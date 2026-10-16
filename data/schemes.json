@@ -42,5 +42,49 @@
     "notes": "Ages 55 to 59 qualify only if retired on superannuation or VRS. Retired defence personnel qualify from age 50.",
     "source_url": "https://sbi.bank.in/web/personal-banking/investments-deposits/govt-schemes/senior-citizens-savings-scheme",
     "apply_url": "https://www.indiapost.gov.in"
+  },
+  {
+    "id": "pmjjby",
+    "name": "Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY)",
+    "state": "All India",
+    "summary": "Affordable renewable life insurance cover of Rs 2,00,000 for death due to any cause.",
+    "rules": { "min_age": 18, "max_age": 50, "requires": ["bank_account"] },
+    "documents": ["Aadhaar card", "Savings bank or post office account details", "Consent-cum-declaration form with nominee details"],
+    "notes": "Available to people aged 18 to 50 having a savings bank account who give consent to join and enable auto-debit on or before 31st May each year.",
+    "source_url": "https://financialservices.gov.in/beta/en/insurance-divisions",
+    "apply_url": "https://www.jansuraksha.gov.in"
+  },
+  {
+    "id": "pmsby",
+    "name": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+    "state": "All India",
+    "summary": "Accident insurance scheme offering accidental death and disability cover of up to Rs 2,00,000.",
+    "rules": { "min_age": 18, "max_age": 70, "requires": ["bank_account"] },
+    "documents": ["Aadhaar card", "Bank account / Post office passbook", "Nominee details"],
+    "notes": "Available to people aged 18 to 70 with an active savings bank account. Annual premium of Rs 20 auto-debited in a single installment.",
+    "source_url": "https://financialservices.gov.in/beta/en/insurance-divisions",
+    "apply_url": "https://www.jansuraksha.gov.in"
+  },
+  {
+    "id": "ssy",
+    "name": "Sukanya Samriddhi Yojana (SSY)",
+    "state": "All India",
+    "summary": "Government-backed small savings scheme for the girl child offering high interest and tax exemptions under Section 80C.",
+    "rules": { "max_age": 10, "requires": ["girl_child"] },
+    "documents": ["Birth certificate of the girl child", "Identity proof of parent/guardian (Aadhaar, PAN)", "Address proof of parent/guardian", "Passport-size photos"],
+    "notes": "Can be opened by biological parents or legal guardians for a girl child from her birth till she attains the age of 10 years. Maximum two accounts per family.",
+    "source_url": "https://www.indiapost.gov.in/Financial/Pages/Content/SSY.aspx",
+    "apply_url": "https://www.indiapost.gov.in"
+  },
+  {
+    "id": "pm_kisan",
+    "name": "PM Kisan Samman Nidhi (PM-KISAN)",
+    "state": "All India",
+    "summary": "Direct income support of Rs 6,000 per year in three equal installments of Rs 2,000 to all landholding farmer families.",
+    "rules": { "min_age": 18, "requires": ["farmer"], "excludes": ["income_tax_payer"] },
+    "documents": ["Aadhaar card", "Land ownership proof / Record of Rights (Khasra/Khatauni)", "Aadhaar-linked bank account passbook", "Active mobile number for OTP"],
+    "notes": "Institutional landholders, income tax payers, and serving or retired government employees are not eligible.",
+    "source_url": "https://pmkisan.gov.in/",
+    "apply_url": "https://pmkisan.gov.in/RegistrationFormUpdated.aspx"
   }
 ]
