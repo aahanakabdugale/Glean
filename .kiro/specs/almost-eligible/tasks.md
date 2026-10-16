@@ -161,9 +161,9 @@ recorded in `docs/friction-log.md`.
 
 ## Checklist
 
-- [ ] T-AE-01 · Constant added and importable
-- [ ] T-AE-02 · Skeleton tests written and failing (red)
-- [ ] T-AE-03 · `check_eligibility()` updated; all scheme tests green
-- [ ] T-AE-04 · `check_scheme_eligibility` tool updated
-- [ ] T-AE-05 · Tool-level tests written and passing
-- [ ] T-AE-06 · Full suite green; before/after counts logged
+- [x] T-AE-01 · Constant added and importable
+- [x] T-AE-02 · Skeleton tests written and failing (red)
+- [x] T-AE-03 · `check_eligibility()` updated; all scheme tests green
+- [x] T-AE-04 · `check_scheme_eligibility` tool updated
+- [x] T-AE-05 · Tool-level tests written and passing
+- [x] T-AE-06 · Full suite green; before/after counts logged
