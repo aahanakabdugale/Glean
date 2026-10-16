@@ -119,5 +119,6 @@ def seed(reset: bool = False):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed demo data for Glean")
-    parser.parse_args()
-    seed(reset=True)
+    parser.add_argument("--reset", action="store_true", default=True, help="Reset tables before seeding")
+    args = parser.parse_args()
+    seed(reset=args.reset)
