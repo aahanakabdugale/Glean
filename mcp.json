@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/mcp.json",
+  "mcpServers": {
+    "glean": {
+      "url": "http://127.0.0.1:8000/mcp",
+      "transport": "streamable-http",
+      "description": "Glean Family Paperwork & Government Schemes Admin Agent MCP Server"
+    }
+  }
+}
