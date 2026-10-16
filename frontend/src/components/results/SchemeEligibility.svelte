@@ -1,98 +1,208 @@
 <script>
-  // SchemeEligibility.svelte — eligibility "tickets" with coloured badges
-  export let data = { personName: '', eligible: [], checkNeeded: [], notEligible: [] };
+  import { ShieldCheck, Calendar, AlertCircle, CheckCircle2, Clock, XCircle, ExternalLink } from '@lucide/svelte';
+
+  export let data = { personName: '', eligible: [], checkNeeded: [], almostEligible: [], notEligible: [] };
 </script>
 
-<div class="renderer" aria-label="Scheme eligibility results for {data.personName}">
-  <h3 class="renderer-title">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-      <path d="M20 12V22H4V12"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
-    </svg>
-    Eligibility for {data.personName}
-  </h3>
+<div class="eligibility-container" role="region" aria-label="Scheme eligibility results for {data.personName}">
+  <div class="header-row">
+    <ShieldCheck size={16} class="header-icon" />
+    <span class="text-label uppercase">Eligibility Overview for {data.personName}</span>
+  </div>
 
+  <!-- 1. May be eligible -->
   {#if data.eligible?.length > 0}
-    <section>
-      <span class="section-head badge badge-teal">May be eligible</span>
-      <ul class="scheme-list" role="list">
+    <div class="group-section">
+      <div class="group-badge-wrap">
+        <span class="vr-badge ok">
+          <CheckCircle2 size={12} />
+          <span>May be eligible</span>
+        </span>
+      </div>
+      <div class="scheme-rows" role="list">
         {#each data.eligible as s}
-          <li class="ticket ticket-teal">
-            <span class="ticket-name">{s.text.split(' — ')[0]}</span>
-            <span class="ticket-reason">{s.text.split(' — ')[1] ?? ''}</span>
-          </li>
+          <div class="vr-list-row ok" role="listitem">
+            <div class="scheme-info">
+              <span class="scheme-name text-body"><strong>{s.text.split(' — ')[0]}</strong></span>
+              <span class="scheme-reason text-small">{s.text.split(' — ')[1] ?? ''}</span>
+            </div>
+          </div>
         {/each}
-      </ul>
-    </section>
+      </div>
+    </div>
   {/if}
 
+  <!-- 2. Verify first (Check needed) -->
   {#if data.checkNeeded?.length > 0}
-    <section>
-      <span class="section-head badge badge-amber">Verify first</span>
-      <ul class="scheme-list" role="list">
+    <div class="group-section">
+      <div class="group-badge-wrap">
+        <span class="vr-badge soon">
+          <Clock size={12} />
+          <span>Verify criteria</span>
+        </span>
+      </div>
+      <div class="scheme-rows" role="list">
         {#each data.checkNeeded as s}
-          <li class="ticket ticket-amber">
-            <span class="ticket-name">{s.text.split(' — ')[0]}</span>
-            <span class="ticket-reason">{s.text.split(' — ')[1] ?? ''}</span>
-          </li>
+          <div class="vr-list-row soon" role="listitem">
+            <div class="scheme-info">
+              <span class="scheme-name text-body"><strong>{s.text.split(' — ')[0]}</strong></span>
+              <span class="scheme-reason text-small">{s.text.split(' — ')[1] ?? ''}</span>
+            </div>
+          </div>
         {/each}
-      </ul>
-    </section>
+      </div>
+    </div>
   {/if}
 
+  <!-- 3. Coming up soon (Almost eligible) -->
+  {#if data.almostEligible?.length > 0}
+    <div class="group-section">
+      <div class="group-badge-wrap">
+        <span class="vr-badge info">
+          <Calendar size={12} />
+          <span>Coming up soon (Within 3 yrs)</span>
+        </span>
+      </div>
+      <div class="scheme-rows" role="list">
+        {#each data.almostEligible as s}
+          <div class="vr-list-row info column-item" role="listitem">
+            <div class="scheme-info">
+              <div class="scheme-title-line">
+                <span class="scheme-name text-body"><strong>{s.text.split(' — ')[0]}</strong></span>
+                <span class="vr-badge info">Almost eligible</span>
+              </div>
+              <span class="scheme-reason text-small">{s.text.split(' — ')[1] ?? ''}</span>
+            </div>
+
+            {#if s.suggestedTask}
+              <div class="task-suggestion">
+                <Calendar size={13} class="calendar-icon" />
+                <span class="task-text text-small">Suggested reminder: {s.suggestedTask}</span>
+              </div>
+            {/if}
+          </div>
+        {/each}
+      </div>
+    </div>
+  {/if}
+
+  <!-- 4. Not eligible ("Why Not") -->
   {#if data.notEligible?.length > 0}
-    <section>
-      <span class="section-head badge badge-coral">Not eligible</span>
-      <ul class="scheme-list" role="list">
+    <div class="group-section">
+      <div class="group-badge-wrap">
+        <span class="vr-badge neutral">
+          <XCircle size={12} />
+          <span>Not eligible today</span>
+        </span>
+      </div>
+      <div class="scheme-rows" role="list">
         {#each data.notEligible as s}
-          <li class="ticket ticket-muted">
-            <span class="ticket-name">{s.text.split(' — ')[0]}</span>
-            <span class="ticket-reason">{s.text.split(' — ')[1] ?? ''}</span>
-          </li>
+          <div class="vr-list-row not-eligible-row" role="listitem">
+            <div class="scheme-info">
+              <span class="scheme-name text-body muted"><strong>{s.text.split(' — ')[0]}</strong></span>
+              <span class="scheme-reason text-small muted">{s.text.split(' — ')[1] ?? ''}</span>
+            </div>
+          </div>
         {/each}
-      </ul>
-    </section>
+      </div>
+    </div>
   {/if}
 
-  <p class="disclaimer">Guidance only — "may be eligible" means the age rule fits. Verify income, category and other criteria on the official portal before applying.</p>
+  <p class="disclaimer text-label">
+    Guidance only, verify on the official site. "May be eligible" indicates criteria check pass; official verification is required.
+  </p>
 </div>
 
 <style>
-  .renderer { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .eligibility-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-16);
+    width: 100%;
+  }
 
-  .renderer-title {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.82rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
     color: var(--text-muted);
   }
 
-  section { display: flex; flex-direction: column; gap: var(--sp-2); }
-
-  .section-head { align-self: flex-start; margin-bottom: 2px; }
-
-  .scheme-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-
-  .ticket {
-    display: flex; flex-direction: column; gap: 3px;
-    padding: var(--sp-3) var(--sp-4);
-    border-radius: var(--r-md);
-    border-left: 4px solid transparent;
+  .uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .ticket-teal  { background: var(--teal-bg);   border-left-color: var(--teal); }
-  .ticket-amber { background: var(--amber-bg);  border-left-color: var(--amber); }
-  .ticket-muted { background: var(--surface-2); border-left-color: var(--border-strong); opacity: 0.7; }
-
-  .ticket-name {
-    font-weight: 600; font-size: 0.88rem; color: var(--text);
+  .group-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
   }
 
-  .ticket-reason {
-    font-size: 0.75rem; color: var(--text-muted);
+  .group-badge-wrap {
+    display: flex;
+  }
+
+  .scheme-rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
+  }
+
+  .scheme-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+  }
+
+  .scheme-title-line {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--sp-8);
+  }
+
+  .scheme-name {
+    color: var(--text);
+  }
+
+  .scheme-reason {
+    color: var(--text-soft);
+  }
+
+  .column-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-8);
+  }
+
+  .task-suggestion {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
+    background: var(--surface-2);
+    padding: var(--sp-6) var(--sp-12);
+    border-radius: var(--r-sm);
+    width: 100%;
+    color: var(--accent);
+  }
+
+  .calendar-icon {
+    flex-shrink: 0;
+  }
+
+  .not-eligible-row {
+    --status-color: var(--line);
+    background: var(--surface);
+    opacity: 0.85;
+  }
+
+  .muted {
+    color: var(--text-muted);
   }
 
   .disclaimer {
-    font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;
-    border-top: 1px solid var(--border); padding-top: var(--sp-2);
+    color: var(--text-muted);
   }
 </style>

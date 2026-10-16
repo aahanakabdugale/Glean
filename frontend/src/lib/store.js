@@ -64,8 +64,16 @@ settings.subscribe(s => {
 export const connectionStatus = writable('unknown');
 
 // ---------- ORB STATE ----------------------------------------
-// 'idle' | 'listening' | 'thinking' | 'speaking'
-export const orbState = writable('idle');
+function initAlexaMic() {
+  if (typeof localStorage !== 'undefined') {
+    const saved = localStorage.getItem('glean-alexa-mic');
+    return saved !== null ? saved === 'true' : true;
+  }
+  return true;
+}
+
+// 'idle' | 'listening' | 'thinking' | 'speaking' | 'muted'
+export const orbState = writable(initAlexaMic() ? 'idle' : 'muted');
 
 // Human-readable label shown under the orb
 export const orbLabel = derived(orbState, s => ({
@@ -73,7 +81,29 @@ export const orbLabel = derived(orbState, s => ({
   listening: 'Listening…',
   thinking:  'Thinking…',
   speaking:  'Speaking…',
+  muted:     'Alexa Mic OFF',
 }[s] ?? 'Ready'));
+
+// ---------- ALEXA MIC (ON / OFF SWITCH) ----------------------
+export const alexaMicEnabled = writable(initAlexaMic());
+
+alexaMicEnabled.subscribe(enabled => {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('glean-alexa-mic', String(enabled));
+  }
+  if (!enabled) {
+    orbState.set('muted');
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  } else {
+    orbState.update(s => (s === 'muted' ? 'idle' : s));
+  }
+});
+
+export function toggleAlexaMic() {
+  alexaMicEnabled.update(m => !m);
+}
 
 // ---------- MESSAGES ----------------------------------------
 // Each message object shape:
@@ -132,4 +162,27 @@ export const familyMembersList = writable([
   { name: 'Jace',     relation: 'son',         birthYear: 2000, status: 'family admin' },
   { name: 'Gwen',     relation: 'daughter',    birthYear: 2003, status: 'family admin' },
 ]);
+
+// ---------- LIVE MCP TOOL-CALL TRACES -------------------------
+export const toolCallTraces = writable([]);
+export const showTracePanel = writable(false);
+
+export function addToolTrace(trace) {
+  toolCallTraces.update(list => [
+    {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+      ...trace,
+    },
+    ...list,
+  ].slice(0, 50)); // Keep latest 50 traces
+}
+
+export function clearToolTraces() {
+  toolCallTraces.set([]);
+}
+
+export function toggleTracePanel() {
+  showTracePanel.update(v => !v);
+}
 

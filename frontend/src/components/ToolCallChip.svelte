@@ -1,7 +1,5 @@
 <script>
-  // ToolCallChip.svelte
-  // Shows which MCP tool was called, its arguments, and the raw result.
-  // Expandable — collapsed by default. Proves the live MCP link to judges.
+  import { ChevronDown, Terminal } from '@lucide/svelte';
 
   export let toolName = '';
   export let toolArgs = {};
@@ -13,51 +11,42 @@
 </script>
 
 {#if toolName}
-  <div class="chip-wrap">
-    <!-- Header row — always visible, click to expand -->
+  <div class="tool-chip-wrap">
+    <!-- Header: small mono chip with source tag (Live in green, Demo in yellow) -->
     <button
-      class="chip-header"
+      type="button"
+      class="chip-btn"
       on:click={() => (open = !open)}
       aria-expanded={open}
-      aria-controls="tool-body-{toolName}"
+      aria-label="Inspect tool call {toolName}"
     >
-      <!-- Tool icon + name -->
-      <span class="chip-left">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-          <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-          <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-        </svg>
-        <code class="tool-name">{toolName}()</code>
-      </span>
+      <div class="chip-left">
+        <Terminal size={14} class="chip-icon" aria-hidden="true" />
+        <span class="tool-name">{toolName}()</span>
+      </div>
 
-      <!-- Right: timing + live/demo badge + chevron -->
-      <span class="chip-right">
-        {#if ms > 0}<span class="timing">{ms}ms</span>{/if}
-        <span class="live-badge" class:live={isLive} class:demo={!isLive}>
-          {isLive ? '⚡ Live HTTP' : '🔵 Demo fallback'}
+      <div class="chip-right">
+        {#if ms > 0}
+          <span class="latency-text">{ms}ms</span>
+        {/if}
+        <span class="source-tag {isLive ? 'live' : 'demo'}">
+          {isLive ? 'Live' : 'Demo fallback'}
         </span>
-        <svg
-          class="chevron"
-          class:rotated={open}
-          width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          aria-hidden="true"
-        >
-          <polyline points="6 9 12 15 18 9"/>
-        </svg>
-      </span>
+        <ChevronDown size={14} class="chevron {open ? 'open' : ''}" aria-hidden="true" />
+      </div>
     </button>
 
-    <!-- Expandable body -->
+    <!-- Expandable raw JSON in mono on --surface-2, max height 240px -->
     {#if open}
-      <div class="chip-body" id="tool-body-{toolName}" role="region" aria-label="Tool call details">
-        <div class="section">
-          <span class="section-label">Arguments</span>
-          <pre class="code-block">{JSON.stringify(toolArgs, null, 2)}</pre>
+      <div class="chip-details" role="region" aria-label="Tool call parameters and result">
+        <div class="detail-block">
+          <span class="block-title">Arguments</span>
+          <pre class="json-code">{JSON.stringify(toolArgs, null, 2)}</pre>
         </div>
         {#if rawResult}
-          <div class="section">
-            <span class="section-label">Raw Result</span>
-            <pre class="code-block result">{rawResult}</pre>
+          <div class="detail-block">
+            <span class="block-title">Raw Output</span>
+            <pre class="json-code result-scroll">{rawResult}</pre>
           </div>
         {/if}
       </div>
@@ -66,126 +55,122 @@
 {/if}
 
 <style>
-  .chip-wrap {
-    margin-top: var(--sp-2);
-    border-radius: var(--r-md);
-    border: 1px solid var(--border);
-    background: var(--surface-2);
-    overflow: hidden;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    transition: var(--theme-transition);
+  .tool-chip-wrap {
+    margin-top: var(--sp-8);
+    display: inline-block;
+    max-width: 100%;
   }
 
-  .chip-header {
-    width: 100%;
-    display: flex;
+  .chip-btn {
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    padding: 6px var(--sp-3);
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text-muted);
+    gap: var(--sp-12);
+    height: 30px;
+    padding: 0 var(--sp-12);
+    border-radius: var(--r-pill);
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
     font-family: var(--font-mono);
-    font-size: 0.72rem;
-    text-align: left;
-    transition: background var(--t-fast) ease;
+    font-size: var(--fs-label);
+    color: var(--text-soft);
+    cursor: pointer;
+    transition: all var(--dur-fast) var(--ease);
   }
 
-  .chip-header:hover {
-    background: var(--surface-3);
+  .chip-btn:hover {
+    border-color: var(--line);
+    color: var(--text);
   }
 
   .chip-left {
     display: flex;
     align-items: center;
-    gap: 6px;
-    color: var(--violet-text);
-    font-weight: 500;
+    gap: var(--sp-6);
+  }
+
+  .chip-icon {
+    color: var(--text-muted);
   }
 
   .tool-name {
-    font-size: 0.72rem;
-    color: var(--violet-text);
+    font-weight: 500;
   }
 
   .chip-right {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    flex-shrink: 0;
+    gap: var(--sp-8);
   }
 
-  .timing {
+  .latency-text {
+    font-size: 11px;
     color: var(--text-muted);
-    font-size: 0.68rem;
   }
 
-  .live-badge {
-    padding: 2px 7px;
-    border-radius: var(--r-full);
-    font-size: 0.65rem;
-    font-weight: 600;
+  /* Source tag (Live in green, Demo fallback in yellow) */
+  .source-tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 1px 6px;
+    border-radius: var(--r-pill);
+    font-size: 11px;
+    font-weight: 500;
   }
-
-  .live-badge.live {
-    background: var(--teal-bg);
-    color: var(--teal-text);
+  .source-tag.live {
+    background: var(--ok-bg);
+    color: var(--badge-ok-color);
   }
-
-  .live-badge.demo {
-    background: var(--amber-bg);
-    color: var(--amber-text);
+  .source-tag.demo {
+    background: var(--soon-bg);
+    color: var(--badge-soon-color);
   }
 
   .chevron {
-    transition: transform var(--t-fast) ease;
-    flex-shrink: 0;
+    transition: transform var(--dur-fast) var(--ease);
+    color: var(--text-muted);
   }
-
-  .chevron.rotated {
+  .chevron.open {
     transform: rotate(180deg);
   }
 
-  .chip-body {
-    border-top: 1px solid var(--border);
-    padding: var(--sp-3);
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
-  }
-
-  .section {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-
-  .section-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--text-muted);
-  }
-
-  .code-block {
-    background: var(--surface);
-    border: 1px solid var(--border);
+  /* Expandable body on --surface-2, max height 240px */
+  .chip-details {
+    margin-top: var(--sp-6);
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
     border-radius: var(--r-sm);
-    padding: var(--sp-2) var(--sp-3);
-    color: var(--text-2);
-    font-size: 0.7rem;
+    padding: var(--sp-12);
+    max-height: 240px;
+    overflow-y: auto;
+    font-family: var(--font-mono);
+  }
+
+  .detail-block {
+    margin-bottom: var(--sp-8);
+  }
+  .detail-block:last-child {
+    margin-bottom: 0;
+  }
+
+  .block-title {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin-bottom: var(--sp-4);
+  }
+
+  .json-code {
+    font-size: var(--fs-label);
+    line-height: var(--lh-mono);
+    color: var(--text);
     white-space: pre-wrap;
     word-break: break-all;
-    max-height: 180px;
-    overflow-y: auto;
-    line-height: 1.5;
   }
 
-  .code-block.result {
-    color: var(--teal-text);
+  .result-scroll {
+    max-height: 120px;
+    overflow-y: auto;
   }
 </style>

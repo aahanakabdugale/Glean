@@ -1,365 +1,406 @@
 <script>
-  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList } from '../lib/store.js';
+  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList, alexaMicEnabled, toggleAlexaMic, toggleTracePanel, toolCallTraces } from '../lib/store.js';
+  import { User, Users, Activity, Mic, MicOff, LayoutGrid, Settings, Sun, Moon } from '@lucide/svelte';
 </script>
 
-<header class="header">
-  <!-- Glean brand: logomark + wordmark + tagline -->
-  <button
-    class="brand"
-    on:click={() => activeView.set('chat')}
-    aria-label="Go to Glean home"
-  >
-    <!-- Logomark: five dots forming a G -->
-    <svg class="logo-mark" width="36" height="36" viewBox="0 0 36 36" fill="none" aria-hidden="true">
-      <rect width="36" height="36" rx="10" fill="var(--violet)"/>
-      <!-- Dots arcing into a G shape -->
-      <circle cx="11" cy="9"  r="2.4" fill="white" opacity="0.55"/>
-      <circle cx="18" cy="7"  r="2.4" fill="white" opacity="0.75"/>
-      <circle cx="25" cy="9"  r="2.4" fill="white"/>
-      <circle cx="27" cy="18" r="2.4" fill="white"/>
-      <circle cx="27" cy="25" r="2.4" fill="var(--teal)"/>
-      <circle cx="21" cy="27" r="2.4" fill="var(--teal)" opacity="0.85"/>
-    </svg>
-
-    <div class="brand-text">
-      <span class="wordmark">Glean</span>
-      <span class="tagline">Your family's paperwork, gathered.</span>
+<header class="top-bar">
+  <!-- Left: Glean Brand (Logomark + Wordmark) -->
+  <button class="brand-btn" on:click={() => activeView.set('chat')} aria-label="Go to Glean home">
+    <div class="logo-icon-wrap" aria-hidden="true">
+      <svg class="glean-mark" width="34" height="34" viewBox="0 0 34 34" fill="none">
+        <defs>
+          <linearGradient id="glean-grad-light" x1="2" y1="2" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#4285F4" />
+            <stop offset="100%" stop-color="#1A73E8" />
+          </linearGradient>
+          <linearGradient id="glean-grad-dark" x1="2" y1="2" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#00CAFF" />
+            <stop offset="100%" stop-color="#2A6CFF" />
+          </linearGradient>
+        </defs>
+        <!-- Rounded Squircle Badge -->
+        <rect width="34" height="34" rx="10" class="tile-bg" />
+        <!-- Layered Paperwork Sheets -->
+        <rect x="8" y="7" width="13" height="17" rx="2.5" fill="white" opacity="0.45" />
+        <rect x="12" y="10" width="14" height="17" rx="2.5" fill="white" />
+        <!-- Document Content Lines -->
+        <path d="M15 14.5H22.5" stroke="#1A73E8" class="doc-line" stroke-width="1.8" stroke-linecap="round" />
+        <path d="M15 18H20.5" stroke="#1A73E8" class="doc-line" stroke-width="1.8" stroke-linecap="round" />
+        <!-- Accent Sparkle -->
+        <path d="M9 20C10.5 20 11.5 19 11.5 17.5C11.5 19 12.5 20 14 20C12.5 20 11.5 21 11.5 22.5C11.5 21 10.5 20 9 20Z" fill="white" opacity="0.9" />
+      </svg>
     </div>
+    <span class="logo-wordmark">GLEAN</span>
   </button>
 
-  <!-- "Who am I?" Persona Selector Dropdown -->
-  <div class="persona-selector" title="Select active family member for personalized briefing">
-    <label for="persona-select" class="persona-label">
-      <span class="persona-avatar" aria-hidden="true">
-        {#if $activePersona === 'all'}
-          👨‍👩‍👧‍👦
-        {:else if $activePersona.toLowerCase() === 'chandler' || $activePersona.toLowerCase().includes('grandpa')}
-          👴
-        {:else if $activePersona.toLowerCase() === 'amy' || $activePersona.toLowerCase().includes('grandma')}
-          👵
-        {:else if $activePersona.toLowerCase() === 'justin' || $activePersona.toLowerCase().includes('dad')}
-          👨
-        {:else if $activePersona.toLowerCase() === 'riley' || $activePersona.toLowerCase().includes('mom')}
-          👩
-        {:else if $activePersona.toLowerCase() === 'jace'}
-          👦
-        {:else if $activePersona.toLowerCase() === 'gwen'}
-          👧
-        {:else}
-          👤
-        {/if}
-      </span>
-      <span class="persona-tag">Who am I:</span>
-    </label>
-    <select
-      id="persona-select"
-      class="persona-select"
-      bind:value={$activePersona}
-      aria-label="Select persona: Who am I?"
-    >
-      <option value="all">Whole Family (Overview)</option>
-      <option value="Chandler">Chandler (Grandfather / 70+)</option>
-      <option value="Amy">Amy (Grandmother / 70+)</option>
-      <option value="Justin">Justin (Father / 50s)</option>
-      <option value="Riley">Riley (Mother / 50s)</option>
-      <option value="Jace">Jace (Son / Admin)</option>
-      <option value="Gwen">Gwen (Daughter / Admin)</option>
-      {#each $familyMembersList as m}
-        {#if !['chandler', 'amy', 'justin', 'riley', 'jace', 'gwen'].includes(m.name.toLowerCase())}
-          <option value={m.name}>{m.name} ({m.relation})</option>
-        {/if}
-      {/each}
-    </select>
+  <!-- Center: Member / Persona Switcher -->
+  <div class="center-group">
+    <div class="persona-pill" title="Filter perspective by family member">
+      {#if $activePersona === 'all'}
+        <Users size={16} class="persona-icon" aria-hidden="true" />
+      {:else}
+        <User size={16} class="persona-icon" aria-hidden="true" />
+      {/if}
+      <label for="persona-select" class="persona-label">Who:</label>
+      <select
+        id="persona-select"
+        class="persona-select"
+        bind:value={$activePersona}
+        aria-label="Active family member"
+      >
+        <option value="all">Whole Family</option>
+        <option value="Chandler">Chandler (Grandfather / 70+)</option>
+        <option value="Amy">Amy (Grandmother / 70+)</option>
+        <option value="Justin">Justin (Father / 50s)</option>
+        <option value="Riley">Riley (Mother / 50s)</option>
+        <option value="Jace">Jace (Son / Admin)</option>
+        <option value="Gwen">Gwen (Daughter / Admin)</option>
+        {#each $familyMembersList as m}
+          {#if !['chandler', 'amy', 'justin', 'riley', 'jace', 'gwen'].includes(m.name.toLowerCase())}
+            <option value={m.name}>{m.name} ({m.relation})</option>
+          {/if}
+        {/each}
+      </select>
+    </div>
   </div>
 
-  <!-- Right-hand controls -->
-  <div class="controls">
-    <!-- Connection status badge -->
-    <div
-      class="status-badge"
-      class:online={$connectionStatus === 'online'}
-      class:offline={$connectionStatus === 'offline'}
-      aria-live="polite"
-      aria-label="Server connection status: {$connectionStatus === 'online' ? 'Connected' : $connectionStatus === 'offline' ? 'Demo mode' : 'Unknown'}"
+  <!-- Right: Status pills & Labeled Controls -->
+  <div class="right-group">
+    <!-- Server connection status -->
+    <button
+      class="status-pill {$connectionStatus === 'online' ? 'ok' : 'soon'}"
+      on:click={toggleTracePanel}
+      aria-label="Server status: {$connectionStatus}. Click for trace panel."
+      title="Click to view MCP Traces"
     >
-      <span class="status-dot" aria-hidden="true"></span>
+      <span class="status-dot"></span>
       <span class="status-text">
-        {#if $connectionStatus === 'online'}
-          Live MCP
-        {:else if $connectionStatus === 'offline'}
-          Demo mode
-        {:else}
-          Connecting…
-        {/if}
+        {$connectionStatus === 'online' ? 'Live MCP HTTP' : 'Demo Mode'}
       </span>
-    </div>
-
-    <!-- Dashboard view toggle -->
-    <button
-      class="icon-btn"
-      class:active={$activeView === 'dashboard'}
-      on:click={() => activeView.set($activeView === 'dashboard' ? 'chat' : 'dashboard')}
-      aria-label="Toggle family dashboard"
-      title="Family Dashboard"
-    >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <rect x="3" y="3" width="7" height="7" rx="1"/>
-        <rect x="14" y="3" width="7" height="7" rx="1"/>
-        <rect x="3" y="14" width="7" height="7" rx="1"/>
-        <rect x="14" y="14" width="7" height="7" rx="1"/>
-      </svg>
     </button>
 
-    <!-- Settings -->
+    <!-- Trace drawer toggle -->
     <button
-      class="icon-btn"
-      class:active={$activeView === 'settings'}
-      on:click={() => activeView.set($activeView === 'settings' ? 'chat' : 'settings')}
-      aria-label="Open settings"
-      title="Settings"
+      class="nav-btn"
+      on:click={toggleTracePanel}
+      aria-label="Open Live MCP protocol traces"
+      title="Live MCP Protocol Trace Panel"
     >
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="12" cy="12" r="3"/>
-        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-      </svg>
+      <Activity size={15} />
+      <span class="nav-text">Traces</span>
+      {#if $toolCallTraces.length > 0}
+        <span class="trace-counter">{$toolCallTraces.length}</span>
+      {/if}
     </button>
 
-    <!-- Theme toggle -->
+    <!-- Alexa Mic hardware toggle -->
     <button
-      class="icon-btn theme-btn"
-      on:click={toggleTheme}
-      aria-label="Switch to {$theme === 'light' ? 'dark' : 'light'} theme"
-      title="Toggle theme"
+      class="nav-btn mic-btn"
+      class:muted={!$alexaMicEnabled}
+      class:active-mic={$alexaMicEnabled}
+      on:click={toggleAlexaMic}
+      aria-label={$alexaMicEnabled ? 'Mute Alexa microphone' : 'Unmute Alexa microphone'}
+      title={$alexaMicEnabled ? 'Alexa Mic is ON. Click to mute.' : 'Alexa Mic is MUTED. Click to unmute.'}
     >
-      {#if $theme === 'light'}
-        <!-- Moon icon -->
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
+      {#if $alexaMicEnabled}
+        <Mic size={15} />
+        <span class="nav-text">Mic ON</span>
       {:else}
-        <!-- Sun icon -->
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
+        <MicOff size={15} />
+        <span class="nav-text">Muted</span>
+      {/if}
+    </button>
+
+    <!-- Dashboard View toggle -->
+    <button
+      class="nav-btn"
+      class:active={$activeView === 'dashboard'}
+      on:click={() => activeView.update(v => v === 'dashboard' ? 'chat' : 'dashboard')}
+      aria-label="Toggle family dashboard"
+      title="Family Admin Dashboard"
+    >
+      <LayoutGrid size={15} />
+      <span class="nav-text">Dashboard</span>
+    </button>
+
+    <!-- Settings modal toggle -->
+    <button
+      class="nav-btn"
+      class:active={$activeView === 'settings'}
+      on:click={() => activeView.update(v => v === 'settings' ? 'chat' : 'settings')}
+      aria-label="Settings"
+      title="System Settings"
+    >
+      <Settings size={15} />
+      <span class="nav-text">Settings</span>
+    </button>
+
+    <!-- Theme toggle (Dark / Light) -->
+    <button
+      class="icon-btn theme-toggle"
+      on:click={toggleTheme}
+      aria-label="Toggle theme between light and dark"
+      title="Toggle Theme"
+    >
+      {#if $theme === 'dark'}
+        <Sun size={16} />
+      {:else}
+        <Moon size={16} />
       {/if}
     </button>
   </div>
 </header>
 
 <style>
-  .header {
+  .top-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--sp-3) var(--sp-5);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-xl);
-    box-shadow: var(--shadow);
-    gap: var(--sp-4);
-    flex-shrink: 0;
-    transition: var(--theme-transition);
+    height: 60px;
+    padding: 0 var(--sp-16);
+    background: transparent;
+    border-bottom: 1px solid var(--line-soft);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    backdrop-filter: blur(12px);
+    transition: border-color var(--dur-base) var(--ease);
   }
 
-  .brand {
+  .brand-btn {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
-    background: none;
+    gap: var(--sp-12);
     border: none;
+    background: transparent;
     cursor: pointer;
     padding: 0;
-    color: inherit;
-    text-align: left;
+    text-decoration: none;
+    transition: transform var(--dur-fast) var(--ease);
+  }
+  .brand-btn:hover {
+    transform: scale(1.03);
   }
 
-  .brand:hover .wordmark {
-    color: var(--violet);
-  }
-
-  .logo-mark {
-    flex-shrink: 0;
-    transition: transform var(--t-base) var(--ease-spring);
-  }
-
-  .brand:hover .logo-mark {
-    transform: scale(1.08) rotate(-3deg);
-  }
-
-  .brand-text {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-  }
-
-  .wordmark {
-    font-family: var(--font-display);
-    font-size: 1.25rem;
-    font-weight: 800;
-    letter-spacing: -0.03em;
-    color: var(--text);
-    transition: color var(--t-base) ease;
-    line-height: 1.1;
-  }
-
-  .tagline {
-    font-size: 0.7rem;
-    color: var(--text-muted);
-    font-weight: 400;
-    letter-spacing: 0.01em;
-    white-space: nowrap;
-  }
-
-  /* Persona Selector ("Who am I?") */
-  .persona-selector {
+  .logo-icon-wrap {
     display: flex;
     align-items: center;
-    gap: 6px;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: var(--r-full);
-    padding: 3px 10px 3px 10px;
-    transition: var(--theme-transition);
+    justify-content: center;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(66, 133, 244, 0.25);
+    flex-shrink: 0;
+  }
+  :global([data-theme="dark"]) .logo-icon-wrap {
+    box-shadow: 0 2px 12px rgba(0, 202, 255, 0.25);
   }
 
-  .persona-selector:hover,
-  .persona-selector:focus-within {
-    border-color: var(--violet);
-    background: var(--violet-bg);
+  /* Logomark background per theme */
+  .tile-bg {
+    fill: url(#glean-grad-light);
+  }
+  :global([data-theme="dark"]) .tile-bg {
+    fill: url(#glean-grad-dark);
+  }
+
+  :global([data-theme="dark"]) .doc-line {
+    stroke: #2A6CFF;
+  }
+
+  /* Wordmark: 16px, weight 600, letter-spacing .2em */
+  .logo-wordmark {
+    font-family: var(--font-ui);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    transition: color var(--dur-base) var(--ease);
+  }
+
+  /* Light theme: Blue */
+  :global([data-theme="light"]) .logo-wordmark {
+    color: var(--accent);
+  }
+
+  /* Dark theme: White */
+  :global([data-theme="dark"]) .logo-wordmark {
+    color: #FFFFFF;
+  }
+
+  .center-group {
+    display: flex;
+    align-items: center;
+  }
+
+  .persona-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-8);
+    height: var(--btn-height);
+    padding: 0 var(--sp-16);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-pill);
+    box-shadow: var(--shadow-card);
+  }
+
+  :global(.persona-icon) {
+    color: var(--text-muted);
+    flex-shrink: 0;
   }
 
   .persona-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    cursor: pointer;
-    user-select: none;
-  }
-
-  .persona-avatar {
-    font-size: 0.95rem;
-    line-height: 1;
-  }
-
-  .persona-tag {
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: var(--fs-label);
+    font-weight: 500;
     color: var(--text-muted);
   }
 
   .persona-select {
-    background: transparent;
     border: none;
+    background: transparent;
+    font-family: var(--font-ui);
+    font-size: var(--fs-small);
+    font-weight: 500;
     color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.78rem;
-    font-weight: 600;
     cursor: pointer;
     outline: none;
-    padding: 2px 2px;
   }
 
-  .persona-select option {
+  .right-group {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+  }
+
+  /* Status Pill */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-8);
+    height: 32px;
+    padding: 0 var(--sp-12);
+    border-radius: var(--r-pill);
+    border: 1px solid var(--line-soft);
     background: var(--surface);
-    color: var(--text);
+    font-size: var(--fs-label);
+    font-weight: 500;
+    cursor: pointer;
+    color: var(--text-soft);
+    transition: all var(--dur-fast) var(--ease);
   }
-
-  .controls {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    flex-shrink: 0;
-  }
-
-  /* Status badge */
-  .status-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px var(--sp-3);
-    border-radius: var(--r-full);
-    font-size: 0.72rem;
-    font-weight: 600;
-    background: var(--surface-2);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    transition: var(--theme-transition);
-    white-space: nowrap;
-  }
-
-  .status-badge.online {
-    background: var(--teal-bg);
-    border-color: var(--teal);
-    color: var(--teal-text);
-  }
-
-  .status-badge.offline {
-    background: var(--amber-bg);
-    border-color: var(--amber);
-    color: var(--amber-text);
+  .status-pill:hover {
+    border-color: var(--line);
   }
 
   .status-dot {
-    width: 7px;
-    height: 7px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: currentColor;
-    flex-shrink: 0;
+  }
+  .status-pill.ok .status-dot {
+    background: var(--ok);
+  }
+  .status-pill.soon .status-dot {
+    background: var(--soon);
   }
 
-  .status-badge.online .status-dot {
-    animation: pulse-dot 2s ease-in-out infinite;
+  @media (max-width: 720px) {
+    .status-text {
+      display: none;
+    }
+    .status-pill {
+      padding: 0 var(--sp-8);
+    }
   }
 
-  @keyframes pulse-dot {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+  /* Navigation Labeled Buttons */
+  .nav-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--sp-6);
+    height: 34px;
+    padding: 0 var(--sp-12);
+    border-radius: var(--r-pill);
+    border: 1px solid var(--line-soft);
+    background: var(--surface);
+    color: var(--text-soft);
+    font-family: var(--font-ui);
+    font-size: var(--fs-small);
+    font-weight: 500;
+    cursor: pointer;
+    position: relative;
+    transition: all var(--dur-fast) var(--ease);
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .nav-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+    border-color: var(--line);
+  }
+  .nav-btn.active {
+    background: var(--surface-2);
+    color: var(--accent);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .nav-btn.mic-btn.muted {
+    background: var(--urgent-bg);
+    color: var(--urgent-text);
+    border-color: var(--urgent);
+  }
+  .nav-btn.mic-btn.active-mic {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+    border-color: var(--ok);
+  }
+  .nav-text {
+    font-size: 13px;
+    line-height: 1;
   }
 
-  /* Icon buttons */
+  /* Theme Toggle Icon Button */
   .icon-btn {
     width: 34px;
     height: 34px;
-    border-radius: var(--r-md);
-    border: 1px solid var(--border);
-    background: transparent;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--line-soft);
+    background: var(--surface);
     color: var(--text-muted);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    display: grid;
-    place-items: center;
-    transition: all var(--t-fast) ease;
+    transition: all var(--dur-fast) var(--ease);
     flex-shrink: 0;
   }
-
   .icon-btn:hover {
     background: var(--surface-2);
     color: var(--text);
-    border-color: var(--border-strong);
+    border-color: var(--line);
   }
 
-  .icon-btn.active {
-    background: var(--violet-bg);
-    color: var(--violet);
-    border-color: var(--violet);
+  .trace-counter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--r-pill);
+    background: var(--accent);
+    color: var(--btn-primary-text);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
   }
 
-  /* Hide tagline on very small screens */
-  @media (max-width: 480px) {
-    .tagline { display: none; }
-    .status-text { display: none; }
-    .status-badge { padding: 5px 8px; }
+  @media (max-width: 1024px) {
+    .nav-text {
+      display: none;
+    }
+    .nav-btn {
+      padding: 0 var(--sp-8);
+      width: 34px;
+      justify-content: center;
+    }
   }
 </style>

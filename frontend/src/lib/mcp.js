@@ -8,22 +8,37 @@
 // ============================================================
 
 import { get } from 'svelte/store';
-import { settings, connectionStatus } from './store.js';
+import { settings, connectionStatus, addToolTrace } from './store.js';
 
 // ---------- Low-level transport ---------------------------
 
-async function callTool(toolName, toolArgs = {}) {
-  const { serverUrl, serverToken } = get(settings);
-  const start = performance.now();
+let sessionId = null;
 
-  const headers = { 'Content-Type': 'application/json' };
+async function ensureSession() {
+  if (sessionId) return sessionId;
+  let { serverUrl, serverToken } = get(settings);
+  if (typeof window !== 'undefined' && window.location.origin) {
+    if (serverUrl.includes('localhost:8000') && window.location.origin.includes('127.0.0.1')) {
+      serverUrl = `${window.location.origin}/mcp`;
+    } else if (serverUrl.includes('127.0.0.1:8000') && window.location.origin.includes('localhost')) {
+      serverUrl = `${window.location.origin}/mcp`;
+    }
+  }
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json, text/event-stream',
+  };
   if (serverToken) headers['Authorization'] = `Bearer ${serverToken}`;
 
   const payload = {
     jsonrpc: '2.0',
-    id: Date.now(),
-    method: 'tools/call',
-    params: { name: toolName, arguments: toolArgs },
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2024-11-05',
+      capabilities: {},
+      clientInfo: { name: 'Glean-WebUI', version: '1.0' },
+    },
   };
 
   try {
@@ -31,12 +46,73 @@ async function callTool(toolName, toolArgs = {}) {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (res.ok) {
+      sessionId = res.headers.get('mcp-session-id');
+      return sessionId;
+    }
+  } catch (e) {
+    // Session initialization failed
+  }
+  return null;
+}
+
+async function callTool(toolName, toolArgs = {}) {
+  let { serverUrl, serverToken } = get(settings);
+  if (typeof window !== 'undefined' && window.location.origin) {
+    if (serverUrl.includes('localhost:8000') && window.location.origin.includes('127.0.0.1')) {
+      serverUrl = `${window.location.origin}/mcp`;
+    } else if (serverUrl.includes('127.0.0.1:8000') && window.location.origin.includes('localhost')) {
+      serverUrl = `${window.location.origin}/mcp`;
+    }
+  }
+  const start = performance.now();
+  let payload = null;
+  let sid = null;
+
+  try {
+    sid = await ensureSession();
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+    };
+    if (serverToken) headers['Authorization'] = `Bearer ${serverToken}`;
+    if (sid) headers['mcp-session-id'] = sid;
+
+    payload = {
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: { name: toolName, arguments: toolArgs },
+    };
+
+    const res = await fetch(serverUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(8000),
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      // If session expired or invalid, reset sessionId so next request re-negotiates
+      if (res.status === 404 || res.status === 400 || res.status === 406) {
+        sessionId = null;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
 
-    const json = await res.json();
+    const rawText = await res.text();
+    let json;
+    if (rawText.startsWith('event:') || rawText.includes('data:')) {
+      const match = rawText.match(/data:\s*({.+})/);
+      if (match) json = JSON.parse(match[1]);
+      else json = JSON.parse(rawText.replace(/^data:\s*/, ''));
+    } else {
+      json = JSON.parse(rawText);
+    }
+
     const ms = Math.round(performance.now() - start);
 
     if (json.error) throw new Error(json.error.message || 'MCP error');
@@ -44,9 +120,37 @@ async function callTool(toolName, toolArgs = {}) {
     const text = json.result?.content?.map(c => c.text).join('\n') ?? '';
     connectionStatus.set('online');
 
+    addToolTrace({
+      toolName,
+      toolArgs,
+      isLive: true,
+      ms,
+      status: '200 OK',
+      requestPayload: payload,
+      responsePayload: json,
+      rawResult: text,
+      sessionId: sid,
+      endpoint: serverUrl,
+    });
+
     return { ok: true, text, ms, isLive: true };
   } catch (err) {
+    const ms = Math.round(performance.now() - start);
     connectionStatus.set('offline');
+
+    addToolTrace({
+      toolName,
+      toolArgs,
+      isLive: false,
+      ms,
+      status: `Failed (${err.message})`,
+      requestPayload: payload || { method: 'tools/call', name: toolName, arguments: toolArgs },
+      responsePayload: { error: err.message },
+      rawResult: err.message,
+      sessionId: sid,
+      endpoint: serverUrl,
+    });
+
     return { ok: false, error: err.message, isLive: false };
   }
 }
@@ -138,6 +242,21 @@ export async function callAddTask(title, due_date, owner = '') {
   return callTool('add_task', { title, due_date, owner });
 }
 
+export async function callGetFamilyDashboard() {
+  const raw = await callTool('get_family_dashboard');
+  if (raw.ok) {
+    return { ...raw, resultType: 'family_dashboard', resultData: parseDashboard(raw.text) };
+  }
+  return {
+    ok: true,
+    text: demoDashboardText(),
+    isLive: false,
+    ms: 0,
+    resultType: 'family_dashboard',
+    resultData: demoDashboardData(),
+  };
+}
+
 // Test connectivity — used by Settings panel
 export async function testConnection() {
   const raw = await callTool('list_family_members');
@@ -174,19 +293,28 @@ function parseUpcomingTasks(text) {
 }
 
 function parseEligibility(text, personName) {
-  const eligible = [], checkNeeded = [], notEligible = [];
+  const eligible = [], checkNeeded = [], almostEligible = [], notEligible = [];
   let section = null;
+  let currentAlmost = null;
   for (const line of text.split('\n')) {
     if (line.includes('May be eligible')) { section = 'eligible'; continue; }
     if (line.includes('Requires verification')) { section = 'check'; continue; }
+    if (line.includes('Coming up soon')) { section = 'almost'; continue; }
     if (line.includes('Not eligible')) { section = 'not'; continue; }
-    if (!line.startsWith('•')) continue;
-    const entry = { text: line.slice(1).trim() };
-    if (section === 'eligible') eligible.push(entry);
-    else if (section === 'check') checkNeeded.push(entry);
-    else if (section === 'not') notEligible.push(entry);
+    if (line.startsWith('•')) {
+      const entry = { text: line.slice(1).trim() };
+      if (section === 'eligible') eligible.push(entry);
+      else if (section === 'check') checkNeeded.push(entry);
+      else if (section === 'almost') {
+        currentAlmost = entry;
+        almostEligible.push(entry);
+      }
+      else if (section === 'not') notEligible.push(entry);
+    } else if ((line.trim().startsWith('→ Suggested:') || line.trim().startsWith('-> Suggested:')) && currentAlmost) {
+      currentAlmost.suggestedTask = line.trim().replace(/^(?:→|->)\s*Suggested:\s*/, '').trim();
+    }
   }
-  return { personName, eligible, checkNeeded, notEligible };
+  return { personName, eligible, checkNeeded, almostEligible, notEligible };
 }
 
 function parseChecklist(text) {
@@ -277,13 +405,18 @@ function demoUpcomingTasks() {
 function demoEligibility(name) {
   const eligible = [
     { text: 'Ayushman Vay Vandana Card (AB PM-JAY) — age fits the age rule. Official link: https://beneficiary.nha.gov.in' },
-    { text: 'Senior Citizens Savings Scheme (SCSS) — age fits the age rule. Official link: https://www.indiapost.gov.in' },
+  ];
+  const almostEligible = [
+    {
+      text: `${name} — ${name} is not eligible for Senior Citizens Savings Scheme today, but may qualify around 2029. Official link: https://sbi.bank.in`,
+      suggestedTask: `Check eligibility for Senior Citizens Savings Scheme (around 2029)`,
+    },
   ];
   const notEligible = [
     { text: 'Atal Pension Yojana (APY) — age requirement not met' },
   ];
-  const text = `Eligibility check for ${name}:\n\nMay be eligible:\n${eligible.map(e => '• ' + e.text).join('\n')}\n\nNot eligible:\n${notEligible.map(e => '• ' + e.text).join('\n')}\n\nNote: Guidance only. Please verify details on official government portals.`;
-  return { text, data: { personName: name, eligible, checkNeeded: [], notEligible } };
+  const text = `Eligibility check for ${name}:\n\nMay be eligible:\n${eligible.map(e => '• ' + e.text).join('\n')}\n\nComing up soon:\n${almostEligible.map(e => '• ' + e.text + '\n  → Suggested: ' + e.suggestedTask).join('\n')}\n\nNot eligible:\n${notEligible.map(e => '• ' + e.text).join('\n')}\n\nNote: Guidance only. Please verify details on official government portals.`;
+  return { text, data: { personName: name, eligible, checkNeeded: [], almostEligible, notEligible } };
 }
 
 function demoChecklist(scheme) {
@@ -336,3 +469,118 @@ function demoMembersData() {
     { name: 'Gwen',     relation: 'daughter',    birthYear: 2003, status: 'family admin' },
   ];
 }
+
+function parseDashboard(text) {
+  const sections = text.split('\n--- ');
+  const metrics = {
+    totalMembers: 0,
+    totalDocs: 0,
+    expiringDocs: 0,
+    urgentDocs: 0,
+    pendingTasks: 0,
+    upcomingTasks: 0,
+    overdueTasks: 0,
+    schemeOpportunities: 0,
+  };
+
+  const headerMatch = text.match(/=== FAMILY ADMIN DASHBOARD \((\d+) Members Tracked\) ===/);
+  if (headerMatch) metrics.totalMembers = parseInt(headerMatch[1], 10);
+
+  const docMatch = text.match(/• Documents: (\d+) tracked \((\d+) expiring in 60d, (\d+) urgent\)/);
+  if (docMatch) {
+    metrics.totalDocs = parseInt(docMatch[1], 10);
+    metrics.expiringDocs = parseInt(docMatch[2], 10);
+    metrics.urgentDocs = parseInt(docMatch[3], 10);
+  }
+
+  const taskMatch = text.match(/• Tasks: (\d+) pending \((\d+) due in 30d, (\d+) overdue\)/);
+  if (taskMatch) {
+    metrics.pendingTasks = parseInt(taskMatch[1], 10);
+    metrics.upcomingTasks = parseInt(taskMatch[2], 10);
+    metrics.overdueTasks = parseInt(taskMatch[3], 10);
+  }
+
+  const schemeMatch = text.match(/• Scheme Opportunities: (\d+) matches identified/);
+  if (schemeMatch) metrics.schemeOpportunities = parseInt(schemeMatch[1], 10);
+
+  const members = [];
+  const expiring = [];
+  const tasks = [];
+  const benefits = [];
+
+  for (const sec of sections) {
+    const lines = sec.split('\n').filter(Boolean);
+    const title = lines[0].replace(' ---', '').trim();
+
+    if (title === 'FAMILY ROSTER' || sec.includes('FAMILY ROSTER')) {
+      for (const line of lines) {
+        const m = line.match(/^• (.+?) \((.+?)\) — Born (\d+), (.+)$/);
+        if (m) members.push({ name: m[1], relation: m[2], birthYear: m[3], status: m[4] });
+      }
+    } else if (title === 'EXPIRING DOCUMENTS' || sec.includes('EXPIRING DOCUMENTS')) {
+      for (const line of lines) {
+        const m = line.match(/^• (.+?)'s (.+?) — expires (\d{4}-\d{2}-\d{2}) \[(.+?)\]$/);
+        if (m) {
+          const status = m[4];
+          const daysMatch = status.match(/-?\d+/);
+          const daysLeft = daysMatch ? parseInt(daysMatch[0], 10) : null;
+          expiring.push({ owner: m[1], member: m[1], docType: m[2], expiryDate: m[3], status, daysLeft });
+        }
+      }
+    } else if (title === 'UPCOMING DEADLINES' || sec.includes('UPCOMING DEADLINES')) {
+      for (const line of lines) {
+        const m = line.match(/^• (.+?) — due (\d{4}-\d{2}-\d{2}) \[(.+?)\]$/);
+        if (m) {
+          const status = m[3];
+          const daysMatch = status.match(/-?\d+/);
+          const daysLeft = daysMatch ? parseInt(daysMatch[0], 10) : null;
+          tasks.push({ title: m[1], dueDate: m[2], status, daysLeft });
+        }
+      }
+    } else if (title === 'BENEFIT OPPORTUNITIES' || sec.includes('BENEFIT OPPORTUNITIES')) {
+      for (const line of lines) {
+        if (line.startsWith('• ')) benefits.push(line.slice(2).trim());
+      }
+    }
+  }
+
+  return { metrics, members, expiring, tasks, benefits, raw: text };
+}
+
+function demoDashboardData() {
+  return {
+    metrics: {
+      totalMembers: 6,
+      totalDocs: 18,
+      expiringDocs: 3,
+      urgentDocs: 1,
+      pendingTasks: 4,
+      upcomingTasks: 3,
+      overdueTasks: 0,
+      schemeOpportunities: 4,
+    },
+    members: demoMembersData(),
+    expiring: [
+      { owner: 'Chandler', member: 'Chandler', docType: 'Passport', expiryDate: '2026-10-21', status: 'URGENT (6d left)', daysLeft: 6 },
+      { owner: 'Justin', member: 'Justin', docType: 'Motor Vehicle Insurance', expiryDate: '2026-10-27', status: '12d left', daysLeft: 12 },
+      { owner: 'Gwen', member: 'Gwen', docType: 'University Transit Pass', expiryDate: '2026-10-30', status: '15d left', daysLeft: 15 },
+    ],
+    tasks: [
+      { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: '2026-10-19', status: '4d left', daysLeft: 4 },
+      { title: "Check Ayushman & senior benefits", member: 'Chandler', dueDate: '2026-10-25', status: '10d left', daysLeft: 10 },
+      { title: "Vehicle insurance renewal check", member: 'Justin', dueDate: '2026-10-29', status: '14d left', daysLeft: 14 },
+    ],
+    benefits: [
+      "Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)",
+      "Chandler qualifies for Senior Citizens Savings Scheme (SCSS)",
+      "Amy qualifies for Ayushman Vay Vandana Card (AB PM-JAY)",
+      "Amy qualifies for Senior Citizens Savings Scheme (SCSS)",
+    ],
+    raw: demoDashboardText(),
+  };
+}
+
+function demoDashboardText() {
+  return `=== FAMILY ADMIN DASHBOARD (6 Members Tracked) ===\n• Documents: 18 tracked (3 expiring in 60d, 1 urgent)\n• Tasks: 4 pending (3 due in 30d, 0 overdue)\n• Scheme Opportunities: 4 matches identified\n\n--- FAMILY ROSTER ---\n• Chandler (grandfather) — Born 1950, retired\n• Amy (grandmother) — Born 1953, retired\n• Justin (father) — Born 1968, employed\n• Riley (mother) — Born 1972, employed\n• Jace (son) — Born 2000, family admin\n• Gwen (daughter) — Born 2003, family admin\n\n--- EXPIRING DOCUMENTS ---\n• Chandler's Passport — expires 2026-10-21 [URGENT (6d left)]\n• Justin's Motor Vehicle Insurance — expires 2026-10-27 [12d left]\n• Gwen's University Transit Pass — expires 2026-10-30 [15d left]\n\n--- UPCOMING DEADLINES ---\n• Renew Chandler's passport appointment (Chandler) — due 2026-10-19 [4d left]\n• Check Ayushman & senior benefits (Chandler) — due 2026-10-25 [10d left]\n\n--- BENEFIT OPPORTUNITIES ---\n• Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n• Amy qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n\nNote: Guidance only. Verified on official portals.`;
+}
+

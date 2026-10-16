@@ -1,140 +1,173 @@
 <script>
-  // PlanApplication.svelte — two-step plan with visual timeline
+  import { Compass, ExternalLink, FileText, CheckCircle2 } from '@lucide/svelte';
+
   export let data = { schemeName: '', status: '', tasks: [], portal: '', docs: [] };
 </script>
 
-<div class="renderer" aria-label="Application plan for {data.schemeName}">
-  <h3 class="renderer-title">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-    </svg>
-    Application Plan
-  </h3>
+<div class="plan-container" role="region" aria-label="Application plan for {data.schemeName}">
+  <div class="header-row">
+    <Compass size={16} class="header-icon" />
+    <span class="text-label uppercase">Application Roadmap</span>
+  </div>
 
   {#if data.schemeName}
-    <div class="scheme-badge">
-      <span class="badge badge-violet">{data.schemeName}</span>
-      {#if data.status}<span class="badge badge-teal">{data.status}</span>{/if}
+    <div class="scheme-title-box">
+      <span class="text-h2"><strong>{data.schemeName}</strong></span>
+      {#if data.status}
+        <span class="vr-badge ok">{data.status}</span>
+      {/if}
     </div>
   {/if}
 
-  <!-- Two-step visual timeline -->
+  <!-- Stepped Action Timeline -->
   {#if data.tasks?.length > 0}
-    <ol class="timeline" aria-label="Steps">
+    <div class="timeline" role="list" aria-label="Application steps">
       {#each data.tasks as task, i}
-        <li class="step">
-          <div class="step-dot" aria-hidden="true">{i + 1}</div>
-          <div class="step-body">
-            <span class="step-label">{task}</span>
+        <div class="step-row" role="listitem">
+          <div class="step-num text-label">{i + 1}</div>
+          <div class="step-content">
+            <span class="step-text text-body">{task}</span>
           </div>
-        </li>
+        </div>
       {/each}
-    </ol>
+    </div>
   {/if}
 
   <!-- Documents needed -->
   {#if data.docs?.length > 0}
-    <div class="docs-section">
-      <span class="docs-title">Documents needed</span>
-      <ul class="docs-list" role="list">
+    <div class="docs-box">
+      <div class="docs-header">
+        <FileText size={14} />
+        <span class="text-label uppercase">Checklist to Prepare</span>
+      </div>
+      <div class="docs-grid">
         {#each data.docs as doc}
-          <li class="doc-bullet">
-            <span class="bullet-dot" aria-hidden="true"></span>
-            {doc}
-          </li>
+          <div class="doc-item text-small">
+            <CheckCircle2 size={13} class="check-icon" />
+            <span>{doc}</span>
+          </div>
         {/each}
-      </ul>
+      </div>
     </div>
   {/if}
 
   {#if data.portal}
-    <a href={data.portal} target="_blank" rel="noopener noreferrer" class="portal-link">
-      Official portal ↗
-    </a>
+    <div class="action-footer">
+      <a href={data.portal} target="_blank" rel="noopener noreferrer" class="vr-btn vr-btn-primary">
+        <span>Go to official portal</span>
+        <ExternalLink size={14} />
+      </a>
+    </div>
   {/if}
 
-  <p class="disclaimer">Guidance only. Verify on the official site.</p>
+  <p class="disclaimer text-label">Guidance only, verify on the official site.</p>
 </div>
 
 <style>
-  .renderer { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .plan-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-12);
+    width: 100%;
+  }
 
-  .renderer-title {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.82rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
     color: var(--text-muted);
   }
 
-  .scheme-badge { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-
-  /* Timeline */
-  .timeline { list-style: none; display: flex; flex-direction: column; gap: 0; position: relative; }
-
-  .timeline::before {
-    content: '';
-    position: absolute;
-    left: 13px; top: 14px;
-    bottom: 14px;
-    width: 2px;
-    background: var(--border);
-    z-index: 0;
+  .uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .step {
-    display: flex; align-items: flex-start; gap: var(--sp-3);
-    position: relative; z-index: 1;
-    padding: var(--sp-2) 0;
+  .scheme-title-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--sp-8);
   }
 
-  .step-dot {
-    width: 28px; height: 28px; flex-shrink: 0;
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
+  }
+
+  .step-row {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-12);
+    padding: var(--sp-12);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+  }
+
+  .step-num {
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    background: var(--violet-bg);
-    border: 2px solid var(--violet);
-    color: var(--violet-text);
-    font-size: 0.75rem; font-weight: 700;
-    display: grid; place-items: center;
-    font-family: var(--font-display);
+    background: var(--accent);
+    color: var(--btn-primary-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    flex-shrink: 0;
   }
 
-  .step-body { padding-top: 4px; }
+  .step-content {
+    flex: 1;
+  }
 
-  .step-label { font-size: 0.88rem; color: var(--text); }
+  .step-text {
+    color: var(--text);
+  }
 
-  .docs-section { display: flex; flex-direction: column; gap: var(--sp-2); }
+  .docs-box {
+    background: var(--surface-2);
+    padding: var(--sp-12);
+    border-radius: var(--r-card);
+    border: 1px solid var(--line-soft);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
+  }
 
-  .docs-title {
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .docs-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
     color: var(--text-muted);
   }
 
-  .docs-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-1); }
-
-  .doc-bullet {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.84rem; color: var(--text-2);
+  .docs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: var(--sp-8);
   }
 
-  .bullet-dot {
-    width: 6px; height: 6px; flex-shrink: 0;
-    border-radius: 50%; background: var(--teal);
+  .doc-item {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-6);
+    color: var(--text-soft);
   }
 
-  .portal-link {
-    padding: 7px var(--sp-3); border-radius: var(--r-md);
-    border: 1px solid var(--teal);
-    background: var(--teal-bg);
-    color: var(--teal-text); font-size: 0.8rem; font-weight: 600;
-    text-decoration: none; align-self: flex-start;
-    transition: all var(--t-fast) ease;
+  .check-icon {
+    color: var(--ok);
+    flex-shrink: 0;
   }
 
-  .portal-link:hover { filter: brightness(1.1); }
+  .action-footer {
+    display: flex;
+  }
 
   .disclaimer {
-    font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;
-    border-top: 1px solid var(--border); padding-top: var(--sp-2);
+    color: var(--text-muted);
   }
 </style>

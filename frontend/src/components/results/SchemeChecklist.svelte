@@ -1,110 +1,152 @@
 <script>
-  // SchemeChecklist.svelte — document checklist with step bullets
+  import { FileCheck, Check, ExternalLink, Info } from '@lucide/svelte';
+
   export let data = { name: '', summary: '', items: [], notes: '', sourceUrl: '', applyUrl: '' };
   let checked = {};
 </script>
 
-<div class="renderer" aria-label="Document checklist for {data.name}">
-  <h3 class="renderer-title">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>
-    </svg>
-    {data.name}
-  </h3>
+<div class="checklist-container" role="region" aria-label="Document checklist for {data.name}">
+  <div class="header-row">
+    <FileCheck size={16} class="header-icon" />
+    <span class="text-label uppercase">Required Documents: {data.name}</span>
+  </div>
 
-  {#if data.summary}<p class="summary">{data.summary}</p>{/if}
+  {#if data.summary}
+    <p class="summary-text text-body">{data.summary}</p>
+  {/if}
 
   {#if data.items?.length > 0}
-    <ul class="checklist" role="list" aria-label="Required documents">
+    <div class="items-list" role="list">
       {#each data.items as item, i}
-        <li class="check-item">
+        <div class="vr-list-row {checked[i] ? 'ok' : 'info'}" role="listitem">
           <button
-            class="check-btn"
+            type="button"
+            class="check-circle"
             class:ticked={checked[i]}
             on:click={() => checked = {...checked, [i]: !checked[i]}}
             aria-pressed={checked[i]}
-            aria-label="{checked[i] ? 'Unmark' : 'Mark'}: {item}"
+            aria-label="{checked[i] ? 'Unmark' : 'Mark'} {item}"
           >
             {#if checked[i]}
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              <Check size={14} />
             {/if}
           </button>
-          <span class="check-label" class:done={checked[i]}>{item}</span>
-        </li>
+          <span class="item-name text-body" class:done={checked[i]}>{item}</span>
+        </div>
       {/each}
-    </ul>
+    </div>
   {/if}
 
-  {#if data.notes}<p class="notes">{data.notes}</p>{/if}
+  {#if data.notes}
+    <div class="notes-box">
+      <Info size={14} class="notes-icon" />
+      <span class="notes-text text-small">{data.notes}</span>
+    </div>
+  {/if}
 
-  <div class="links">
-    {#if data.sourceUrl}
-      <a href={data.sourceUrl} target="_blank" rel="noopener noreferrer" class="link-btn">
-        Official details ↗
+  <div class="actions-row">
+    {#if data.applyUrl}
+      <a href={data.applyUrl} target="_blank" rel="noopener noreferrer" class="vr-btn vr-btn-primary">
+        <span>Apply online</span>
+        <ExternalLink size={14} />
       </a>
     {/if}
-    {#if data.applyUrl}
-      <a href={data.applyUrl} target="_blank" rel="noopener noreferrer" class="link-btn apply">
-        Apply online ↗
+    {#if data.sourceUrl}
+      <a href={data.sourceUrl} target="_blank" rel="noopener noreferrer" class="vr-btn vr-btn-secondary">
+        <span>Official portal</span>
+        <ExternalLink size={14} />
       </a>
     {/if}
   </div>
 
-  <p class="disclaimer">Guidance only. Verify on the official site.</p>
+  <p class="disclaimer text-label">Guidance only, verify on the official site.</p>
 </div>
 
 <style>
-  .renderer { display: flex; flex-direction: column; gap: var(--sp-3); }
-
-  .renderer-title {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.88rem; font-weight: 700; color: var(--text); line-height: 1.3;
+  .checklist-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-12);
+    width: 100%;
   }
 
-  .summary { font-size: 0.82rem; color: var(--text-2); }
-
-  .checklist { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-
-  .check-item { display: flex; align-items: flex-start; gap: var(--sp-2); }
-
-  .check-btn {
-    width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px;
-    border-radius: 5px; border: 2px solid var(--border-strong);
-    background: transparent; cursor: pointer;
-    display: grid; place-items: center;
-    transition: all var(--t-base) var(--ease-spring);
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    color: var(--text-muted);
   }
 
-  .check-btn.ticked { background: var(--green); border-color: var(--green); color: white; }
-
-  .check-label { font-size: 0.88rem; color: var(--text); line-height: 1.4; }
-  .check-label.done { text-decoration: line-through; color: var(--text-muted); }
-
-  .notes {
-    font-size: 0.78rem; color: var(--text-muted);
-    padding: var(--sp-2) var(--sp-3);
-    background: var(--violet-bg);
-    border-radius: var(--r-md);
-    border-left: 3px solid var(--violet);
+  .uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .links { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-
-  .link-btn {
-    padding: 6px var(--sp-3); border-radius: var(--r-md);
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text-2); font-size: 0.78rem; font-weight: 600;
-    text-decoration: none; transition: all var(--t-fast) ease;
+  .summary-text {
+    color: var(--text-soft);
   }
 
-  .link-btn:hover { background: var(--teal-bg); color: var(--teal-text); border-color: var(--teal); }
-  .link-btn.apply { background: var(--teal-bg); color: var(--teal-text); border-color: var(--teal); }
+  .items-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
+  }
+
+  .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-right: var(--sp-8);
+    color: var(--ok);
+    transition: all var(--dur-fast) var(--ease);
+  }
+
+  .check-circle.ticked {
+    border-color: var(--ok);
+    background: var(--ok-bg);
+  }
+
+  .item-name {
+    flex: 1;
+    color: var(--text);
+  }
+
+  .item-name.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
+
+  .notes-box {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--sp-8);
+    background: var(--surface-2);
+    padding: var(--sp-12);
+    border-radius: var(--r-sm);
+    color: var(--text-soft);
+  }
+
+  .notes-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: var(--accent);
+  }
+
+  .actions-row {
+    display: flex;
+    gap: var(--sp-8);
+    flex-wrap: wrap;
+    margin-top: var(--sp-4);
+  }
 
   .disclaimer {
-    font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;
-    border-top: 1px solid var(--border); padding-top: var(--sp-2);
+    color: var(--text-muted);
   }
 </style>

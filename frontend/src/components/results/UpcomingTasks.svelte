@@ -1,5 +1,7 @@
 <script>
-  // UpcomingTasks.svelte — checklist with animated tick
+  import { urgencyOf, formatDaysLeft } from '../../lib/urgency.js';
+  import { CalendarCheck, Check, AlertCircle, Clock } from '@lucide/svelte';
+
   export let data = [];
   let checked = {};
 
@@ -8,106 +10,138 @@
   }
 </script>
 
-<div class="renderer" aria-label="Upcoming tasks">
-  <h3 class="renderer-title">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-      <polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-    </svg>
-    Upcoming Tasks
-  </h3>
+<div class="tasks-container" role="region" aria-label="Upcoming tasks">
+  <div class="header-row">
+    <CalendarCheck size={16} class="header-icon" />
+    <span class="text-label uppercase">Upcoming Tasks</span>
+  </div>
 
   {#if !data || data.length === 0}
-    <p class="empty">No tasks due — all clear! ✅</p>
+    <p class="empty-state text-body">No pending tasks found. All deadlines are clear.</p>
   {:else}
-    <ul class="task-list" role="list">
+    <div class="task-list" role="list">
       {#each data as task, i}
-        <li class="task-item" class:done={checked[i]}>
-          <button
-            class="check-btn"
-            class:ticked={checked[i]}
-            on:click={() => toggle(i)}
-            aria-label="{checked[i] ? 'Unmark' : 'Mark'} task as done: {task.title}"
-            aria-pressed={checked[i]}
-          >
-            {#if checked[i]}
-              <!-- Tick SVG -->
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            {/if}
-          </button>
+        {@const level = task.overdue ? 'urgent' : urgencyOf(task.daysLeft)}
+        <div class="vr-list-row {level}" class:done={checked[i]} role="listitem">
+          <div class="task-left">
+            <button
+              type="button"
+              class="check-circle"
+              class:ticked={checked[i]}
+              on:click={() => toggle(i)}
+              aria-label="{checked[i] ? 'Unmark' : 'Mark'} task: {task.title}"
+              aria-pressed={checked[i]}
+            >
+              {#if checked[i]}
+                <Check size={14} />
+              {/if}
+            </button>
 
-          <div class="task-info">
-            <span class="task-title">{task.title}</span>
-            <span class="task-meta">
-              {#if task.member}<span class="task-member">{task.member}</span>{/if}
-              <span class="badge {task.overdue ? 'badge-coral' : 'badge-sky'}">{task.statusText}</span>
+            <div class="task-details">
+              <span class="task-title text-body" class:done={checked[i]}>
+                <strong>{task.title}</strong>
+              </span>
+              {#if task.member}
+                <span class="task-member text-small">{task.member}</span>
+              {/if}
+            </div>
+          </div>
+
+          <div class="task-right">
+            <span class="vr-badge {level}">
+              {#if task.overdue}
+                <AlertCircle size={12} />
+              {:else}
+                <Clock size={12} />
+              {/if}
+              <span>{task.statusText || formatDaysLeft(task.daysLeft)}</span>
             </span>
           </div>
-        </li>
+        </div>
       {/each}
-    </ul>
+    </div>
   {/if}
 
-  <p class="disclaimer">Guidance only. Verify on the official site.</p>
+  <p class="disclaimer text-label">Guidance only, verify on the official site.</p>
 </div>
 
 <style>
-  .renderer { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .tasks-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-12);
+    width: 100%;
+  }
 
-  .renderer-title {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.82rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .header-row {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
     color: var(--text-muted);
   }
 
-  .empty { font-size: 0.88rem; color: var(--teal-text); }
-
-  .task-list { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); }
-
-  .task-item {
-    display: flex; align-items: flex-start; gap: var(--sp-3);
-    padding: var(--sp-3) var(--sp-4);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    transition: opacity var(--t-base) ease;
+  .uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
   }
 
-  .task-item.done { opacity: 0.45; }
+  .empty-state {
+    color: var(--ok-text);
+    padding: var(--sp-12);
+  }
 
-  .check-btn {
-    width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px;
-    border-radius: 6px;
-    border: 2px solid var(--border-strong);
+  .task-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-8);
+  }
+
+  .task-left {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-12);
+  }
+
+  .check-circle {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
     background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    display: grid; place-items: center;
-    transition: all var(--t-base) var(--ease-spring);
+    flex-shrink: 0;
+    color: var(--ok);
+    transition: all var(--dur-fast) var(--ease);
   }
 
-  .check-btn.ticked {
-    background: var(--green);
-    border-color: var(--green);
-    color: white;
-    transform: scale(1.1);
+  .check-circle.ticked {
+    border-color: var(--ok);
+    background: var(--ok-bg);
   }
 
-  .task-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .task-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
 
-  .task-title { font-size: 0.88rem; font-weight: 500; color: var(--text); }
+  .task-title {
+    color: var(--text);
+  }
 
-  .task-meta { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
+  .task-title.done {
+    text-decoration: line-through;
+    color: var(--text-muted);
+  }
 
   .task-member {
-    font-size: 0.72rem; color: var(--text-muted);
-    padding: 1px 6px; border-radius: var(--r-full);
-    background: var(--violet-bg); color: var(--violet-text);
+    color: var(--text-muted);
   }
 
   .disclaimer {
-    font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;
-    border-top: 1px solid var(--border); padding-top: var(--sp-2);
+    color: var(--text-muted);
   }
 </style>

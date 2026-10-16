@@ -1,8 +1,6 @@
 <script>
-  // InputDock.svelte
-  // The bottom input bar: mic button (STT), text field, send button.
-
-  import { orbState } from '../lib/store.js';
+  import { orbState, alexaMicEnabled, toggleAlexaMic } from '../lib/store.js';
+  import { Mic, Send, Square } from '@lucide/svelte';
 
   export let onSend = (/** @type {string} */ _text) => {};
 
@@ -16,15 +14,24 @@
     if (SR) {
       recognition = new SR();
       recognition.continuous = false;
-      recognition.lang = 'en-IN'; // Indian English, falls back gracefully
+      recognition.lang = 'en-IN';
 
-      recognition.onstart  = () => { listening = true;  orbState.set('listening'); };
+      recognition.onstart = () => {
+        listening = true;
+        orbState.set('listening');
+      };
       recognition.onresult = (e) => {
         text = e.results[0][0].transcript;
         handleSend();
       };
-      recognition.onend   = () => { listening = false; orbState.set('idle'); };
-      recognition.onerror = () => { listening = false; orbState.set('idle'); };
+      recognition.onend = () => {
+        listening = false;
+        orbState.set($alexaMicEnabled ? 'idle' : 'error');
+      };
+      recognition.onerror = () => {
+        listening = false;
+        orbState.set($alexaMicEnabled ? 'idle' : 'error');
+      };
     }
   }
 
@@ -43,154 +50,190 @@
   }
 
   function toggleMic() {
+    if (!$alexaMicEnabled) {
+      alexaMicEnabled.set(true);
+    }
     if (!recognition) {
-      alert('Speech recognition is not supported in this browser. Try Chrome or Edge.');
+      // Fallback for browsers or environments without WebSpeech API
+      if (listening) {
+        listening = false;
+        orbState.set('idle');
+      } else {
+        listening = true;
+        orbState.set('listening');
+        setTimeout(() => {
+          if (listening) {
+            listening = false;
+            orbState.set('idle');
+            text = "What documents are expiring soon?";
+            handleSend();
+          }
+        }, 1800);
+      }
       return;
     }
     if (listening) {
       recognition.stop();
     } else {
-      recognition.start();
+      try {
+        recognition.start();
+      } catch (err) {
+        // Recognition already active
+      }
     }
   }
 </script>
 
-<div class="dock card">
-  <!-- Mic button -->
-  <button
-    class="mic-btn"
-    class:listening
-    on:click={toggleMic}
-    aria-label={listening ? 'Stop listening' : 'Speak your query (voice input)'}
-    title={listening ? 'Tap to stop' : 'Voice input'}
-  >
-    {#if listening}
-      <!-- Stop icon -->
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <rect x="6" y="6" width="12" height="12" rx="2"/>
-      </svg>
-    {:else}
-      <!-- Mic icon -->
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-      </svg>
-    {/if}
-  </button>
+<div class="ask-bar-wrap" role="search" aria-label="Ask Glean">
+  <div class="ask-pill" class:focused={false}>
+    <!-- Mic button: 38px circle -->
+    <button
+      type="button"
+      class="mic-btn"
+      class:recording={listening}
+      on:click={toggleMic}
+      aria-label={listening ? 'Stop listening' : 'Start voice input'}
+      title={listening ? 'Listening... click to stop' : 'Click to speak'}
+    >
+      {#if listening}
+        <Square size={16} />
+      {:else}
+        <Mic size={18} />
+      {/if}
+    </button>
 
-  <!-- Text input -->
-  <input
-    type="text"
-    bind:value={text}
-    on:keydown={handleKey}
-    placeholder="Ask Glean anything about your family's paperwork…"
-    class="text-input"
-    aria-label="Type your message"
-    autocomplete="off"
-    spellcheck="false"
-  />
+    <!-- Text input -->
+    <input
+      type="text"
+      class="ask-input"
+      bind:value={text}
+      on:keydown={handleKey}
+      placeholder="Ask Glean anything about your family's paperwork..."
+      aria-label="Ask Glean anything about your family's paperwork"
+    />
 
-  <!-- Send button -->
-  <button
-    class="send-btn"
-    on:click={handleSend}
-    disabled={!text.trim()}
-    aria-label="Send message"
-    title="Send"
-  >
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-    </svg>
-  </button>
+    <!-- Send button: 38px circle -->
+    <button
+      type="button"
+      class="send-btn"
+      class:active={text.trim().length > 0}
+      on:click={handleSend}
+      disabled={!text.trim()}
+      aria-label="Send query"
+      title="Send"
+    >
+      <Send size={16} />
+    </button>
+  </div>
 </div>
 
-<!-- Simulated Alexa+ label, no logos -->
-<p class="alexa-label">Simulated Alexa+ voice session</p>
-
 <style>
-  .dock {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-2);
-    padding: var(--sp-2) var(--sp-3);
-    border-radius: var(--r-xl);
-    flex-shrink: 0;
+  .ask-bar-wrap {
+    width: 100%;
+    max-width: 720px;
+    margin: 0 auto;
+    padding: var(--sp-8) 0;
   }
 
-  /* Mic button */
+  /* 52px pill, --surface-2 fill */
+  .ask-pill {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
+    height: var(--input-height);
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-pill);
+    padding: 0 var(--sp-8);
+    box-shadow: var(--shadow-card);
+    transition: all var(--dur-fast) var(--ease);
+  }
+
+  .ask-pill:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(66, 133, 244, 0.15);
+    background: var(--surface);
+  }
+  :global([data-theme="dark"]) .ask-pill:focus-within {
+    box-shadow: 0 0 0 3px rgba(0, 202, 255, 0.15);
+  }
+
+  /* Mic button: 38px circle */
   .mic-btn {
-    width: 44px; height: 44px;
-    border-radius: 50%;
+    width: var(--mic-size);
+    height: var(--mic-size);
+    border-radius: var(--r-pill);
     border: none;
-    background: var(--brand-grad);
-    color: white;
-    display: grid; place-items: center;
+    background: var(--surface);
+    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    box-shadow: 0 0 14px color-mix(in srgb, var(--violet) 35%, transparent);
-    transition: all var(--t-base) var(--ease-spring);
+    transition: all var(--dur-fast) var(--ease);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
   }
 
   .mic-btn:hover {
-    transform: scale(1.07);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--violet) 50%, transparent);
+    transform: scale(1.05);
+    background: var(--accent);
+    color: var(--btn-primary-text);
   }
 
-  .mic-btn.listening {
-    background: var(--brand-grad-2); /* coral/amber */
-    box-shadow: 0 0 20px color-mix(in srgb, var(--coral) 50%, transparent);
-    animation: mic-pulse 1s ease-in-out infinite alternate;
+  /* Mic recording state turns the button --urgent */
+  .mic-btn.recording {
+    background: var(--urgent);
+    color: var(--btn-primary-text);
+    animation: pulse-mic 1.2s infinite alternate;
   }
 
-  @keyframes mic-pulse {
-    from { transform: scale(1); }
-    to   { transform: scale(1.08); }
+  @keyframes pulse-mic {
+    0% { transform: scale(1); }
+    100% { transform: scale(1.1); box-shadow: 0 0 12px var(--urgent); }
   }
 
-  /* Text input */
-  .text-input {
+  .ask-input {
     flex: 1;
-    background: transparent;
+    height: 100%;
     border: none;
-    outline: none;
+    background: transparent;
+    font-family: var(--font-ui);
+    font-size: var(--fs-body);
+    font-weight: 400;
     color: var(--text);
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    padding: var(--sp-2) var(--sp-2);
-    min-width: 0;
+    outline: none;
+    padding: 0 var(--sp-4);
   }
 
-  .text-input::placeholder { color: var(--text-muted); }
+  .ask-input::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+  }
 
-  /* Send button */
+  /* Send button: 38px circle */
   .send-btn {
-    width: 38px; height: 38px;
-    border-radius: var(--r-md);
-    border: 1px solid var(--border);
+    width: var(--mic-size);
+    height: var(--mic-size);
+    border-radius: var(--r-pill);
+    border: none;
     background: transparent;
     color: var(--text-muted);
-    display: grid; place-items: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     flex-shrink: 0;
-    transition: all var(--t-fast) ease;
+    transition: all var(--dur-fast) var(--ease);
   }
 
-  .send-btn:hover:not(:disabled) {
-    background: var(--violet);
-    color: white;
-    border-color: var(--violet);
-    box-shadow: 0 0 12px color-mix(in srgb, var(--violet) 40%, transparent);
+  .send-btn.active {
+    background: var(--accent);
+    color: var(--btn-primary-text);
   }
 
-  .send-btn:disabled { opacity: 0.35; cursor: default; }
-
-  /* Alexa+ label — plain text only, no logo */
-  .alexa-label {
-    text-align: center;
-    font-size: 0.68rem;
-    color: var(--text-muted);
-    opacity: 0.7;
-    flex-shrink: 0;
-    letter-spacing: 0.02em;
+  .send-btn:disabled {
+    cursor: default;
+    opacity: 0.4;
   }
 </style>

@@ -4,14 +4,13 @@
   // SettingsPanel, and the MCP dispatcher.
 
   import Header        from './components/Header.svelte';
-  import VoiceOrb      from './components/VoiceOrb.svelte';
-  import QuickChips    from './components/QuickChips.svelte';
-  import ChatPane      from './components/ChatPane.svelte';
-  import InputDock     from './components/InputDock.svelte';
+  import VoiceScreen   from './components/VoiceScreen.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
+  import DashboardView from './components/DashboardView.svelte';
+  import TracePanel    from './components/TracePanel.svelte';
 
   import { onMount } from 'svelte';
-  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList } from './lib/store.js';
+  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList, showTracePanel } from './lib/store.js';
   import * as mcp from './lib/mcp.js';
 
   onMount(async () => {
@@ -53,7 +52,11 @@
     let result;
 
     try {
-      if (q.includes('brief') || q.includes('morning') || q.includes('summary') || q.includes('update')) {
+      if (q.includes('dashboard')) {
+        result = await mcp.callGetFamilyDashboard();
+        result.toolName = 'get_family_dashboard';
+        result.toolArgs = {};
+      } else if (q.includes('brief') || q.includes('morning') || q.includes('summary') || q.includes('update')) {
         const persona = $activePersona;
         result = await mcp.callFamilyBrief(persona);
         result.toolName = 'family_brief';
@@ -68,8 +71,8 @@
         result = await mcp.callPlanSchemeApplication(person, scheme, 7);
         result.toolName = 'plan_scheme_application';
         result.toolArgs = { name: person, scheme, days_to_prepare: 7 };
-      } else if (q.includes('scheme') || q.includes('qualif') || q.includes('eligible') || q.includes('benefit')) {
-        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Ramesh');
+      } else if (q.includes('scheme') || q.includes('qualif') || q.includes('eligible') || q.includes('benefit') || q.includes('why') || q.includes('reason') || q.includes('reject')) {
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Justin');
         result = await mcp.callCheckSchemeEligibility(person);
         result.toolName = 'check_scheme_eligibility';
         result.toolArgs = { name: person };
@@ -135,138 +138,94 @@
   function extractScheme(q) {
     if (q.includes('ayushman')) return 'ayushman_vay_vandana';
     if (q.includes('scss') || q.includes('saving')) return 'scss';
-    if (q.includes('apy') || q.includes('pension')) return 'apy';
+    if (q.includes('apy') || q.includes('atal')) return 'apy';
     if (q.includes('ignoaps') || q.includes('old age')) return 'ignoaps_mh';
+    if (q.includes('pmjjby') || q.includes('jeevan jyoti') || q.includes('life insurance')) return 'pmjjby';
+    if (q.includes('pmsby') || q.includes('suraksha') || q.includes('accident')) return 'pmsby';
+    if (q.includes('sukanya') || q.includes('ssy') || q.includes('girl child')) return 'ssy';
+    if (q.includes('kisan') || q.includes('farmer')) return 'pm_kisan';
     return null;
   }
 </script>
 
 <!-- ===================== LAYOUT ===================== -->
-<div class="app-layout">
-
-  <!-- Fixed top header -->
+<div class="app-layout" class:data-view={$activeView !== 'chat'} class:settings-view={$activeView === 'settings'}>
+  <!-- Top bar on every page -->
   <Header />
 
-  <!-- Main content area changes based on active view -->
-  <main class="main-area" aria-label="Glean main content">
-
+  <!-- Main content area -->
+  <main class="main-content" aria-label="Glean main content">
     {#if $activeView === 'settings'}
-      <!-- Settings panel replaces the chat -->
       <SettingsPanel />
-
+    {:else if $activeView === 'dashboard'}
+      <DashboardView onAction={(prompt) => { activeView.set('chat'); handleSend(prompt); }} />
     {:else}
-      <!-- Left column: orb + quick chips (hidden on mobile, shown on tablet+) -->
-      <aside class="side-col" aria-label="Voice input area">
-        <div class="orb-area">
-          <VoiceOrb />
-        </div>
-        <QuickChips onChipClick={handleSend} />
-      </aside>
-
-      <!-- Right column: chat + input -->
-      <section class="chat-col" aria-label="Chat">
-        <ChatPane />
-
-        <!-- Quick chips row on mobile -->
-        <div class="mobile-chips">
-          <QuickChips onChipClick={handleSend} />
-        </div>
-
-        <InputDock onSend={handleSend} />
-      </section>
+      <VoiceScreen onSend={handleSend} />
     {/if}
-
   </main>
 
-  <!-- Footer disclaimer -->
-  <footer class="footer">
-    <span>Glean gives guidance only. Verify on the official site.</span>
-  </footer>
+  <!-- Footer: small muted 12px text (hidden in settings view to keep 1-page fit) -->
+  {#if $activeView !== 'settings'}
+    <footer class="app-footer">
+      <p class="text-label footer-disclaimer">Glean gives guidance only. Verify on the official site.</p>
+    </footer>
+  {/if}
+
+  <!-- Live MCP Protocol Trace Drawer -->
+  {#if $showTracePanel}
+    <TracePanel />
+  {/if}
 </div>
 
 <style>
-  /* Full-height flex column */
   .app-layout {
     min-height: 100dvh;
-    max-width: 1200px;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
     margin: 0 auto;
-    padding: var(--sp-4);
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-3);
+    transition: background-color var(--dur-base) var(--ease);
   }
 
-  .main-area {
-    flex: 1;
-    display: flex;
-    gap: var(--sp-4);
-    min-height: 0; /* allows children to scroll */
+  .app-layout.settings-view {
+    min-height: 100dvh;
   }
 
-  /* ---- Side column (orb + chips) ---- */
-  .side-col {
-    width: 200px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--sp-5);
-    padding-top: var(--sp-4);
-  }
-
-  .orb-area {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
-
-  /* Quick chips vertical in side column */
-  .side-col :global(.chips-row) {
-    flex-direction: column;
-    overflow-x: visible;
-    overflow-y: auto;
-    width: 100%;
-    max-height: calc(100dvh - 320px);
-  }
-
-  .side-col :global(.chip) {
-    width: 100%;
-    justify-content: flex-start;
-    border-radius: var(--r-md);
-  }
-
-  /* ---- Chat column ---- */
-  .chat-col {
+  .main-content {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
-    min-width: 0;
+    align-items: center;
+    width: 100%;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--sp-16) var(--sp-24) 0 var(--sp-24);
   }
 
-  /* Mobile chips (hidden on desktop) */
-  .mobile-chips { display: none; }
+  .settings-view .main-content {
+    justify-content: center;
+    padding: var(--sp-16) var(--sp-24);
+    min-height: 0;
+  }
 
-  /* ---- Footer ---- */
-  .footer {
+  .data-view .main-content {
+    max-width: 1200px;
+  }
+
+  .app-footer {
     text-align: center;
-    font-size: 0.68rem;
+    padding: var(--sp-16) var(--sp-16) var(--sp-24) var(--sp-16);
+    margin-top: auto;
+  }
+
+  .footer-disclaimer {
     color: var(--text-muted);
-    opacity: 0.6;
-    padding-bottom: var(--sp-2);
+    font-size: var(--fs-label);
   }
 
-  /* ---- Responsive breakpoints ---- */
-
-  /* Tablet: collapse side column */
-  @media (max-width: 768px) {
-    .side-col { display: none; }
-    .mobile-chips { display: block; }
-    .main-area { flex-direction: column; }
-  }
-
-  /* Phone */
-  @media (max-width: 480px) {
-    .app-layout { padding: var(--sp-2); gap: var(--sp-2); }
+  @media (max-width: 720px) {
+    .main-content {
+      padding: var(--sp-12) var(--sp-12) 0 var(--sp-12);
+    }
   }
 </style>

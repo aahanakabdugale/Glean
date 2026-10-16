@@ -1,30 +1,41 @@
 <script>
-  import { orbState, orbLabel } from '../lib/store.js';
+  import { orbState, orbLabel, alexaMicEnabled, toggleAlexaMic } from '../lib/store.js';
 </script>
 
 <!-- Voice orb stage — organic blob background + central orb -->
-<div class="orb-stage" aria-hidden="true">
+<div class="orb-stage">
   <!-- Soft blob shape behind the orb (CSS clip-path) -->
-  <div class="blob" class:active={$orbState !== 'idle'}></div>
+  <div class="blob" class:active={$orbState !== 'idle' && $orbState !== 'muted'} class:muted={$orbState === 'muted'}></div>
 
-  <!-- The orb itself -->
-  <div
+  <!-- The orb itself — clicking toggles Alexa Mic On/Off -->
+  <button
     class="orb"
     class:idle={$orbState === 'idle'}
     class:listening={$orbState === 'listening'}
     class:thinking={$orbState === 'thinking'}
     class:speaking={$orbState === 'speaking'}
-    aria-label={$orbLabel}
-    role="status"
+    class:muted={$orbState === 'muted'}
+    on:click={toggleAlexaMic}
+    aria-label={$alexaMicEnabled ? 'Alexa microphone is ON. Click to turn off.' : 'Alexa microphone is OFF (Muted). Click to turn on.'}
+    title={$alexaMicEnabled ? 'Tap orb to mute / switch Alexa mic OFF' : 'Tap orb to unmute / switch Alexa mic ON'}
   >
     <!-- Inner glow core -->
-    <div class="orb-core"></div>
+    <div class="orb-core">
+      {#if $orbState === 'muted'}
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6"/>
+          <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+          <line x1="12" y1="19" x2="12" y2="22"/>
+        </svg>
+      {/if}
+    </div>
 
     <!-- Ripple rings (visible in listening + speaking states) -->
     <div class="ring ring-1"></div>
     <div class="ring ring-2"></div>
     <div class="ring ring-3"></div>
-  </div>
+  </button>
 </div>
 
 <!-- Status label below the orb -->
@@ -63,11 +74,17 @@
     position: relative;
     display: grid;
     place-items: center;
-    cursor: default;
+    cursor: pointer;
+    border: none;
+    padding: 0;
     /* Default: idle state colour */
     background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--orb-idle) 30%, white), var(--orb-idle) 70%);
     box-shadow: 0 0 24px color-mix(in srgb, var(--orb-idle) 40%, transparent);
     transition: background var(--t-slow) ease, box-shadow var(--t-slow) ease, transform var(--t-base) var(--ease-spring);
+  }
+
+  .orb:hover {
+    transform: scale(1.05);
   }
 
   /* ---- Idle: slow breathing ---- */
@@ -110,6 +127,34 @@
   @keyframes speak-wave {
     from { transform: scale(1);    box-shadow: 0 0 20px color-mix(in srgb, var(--orb-speak) 40%, transparent); }
     to   { transform: scale(1.1);  box-shadow: 0 0 44px color-mix(in srgb, var(--orb-speak) 60%, transparent); }
+  }
+
+  /* ---- Muted / Mic OFF: red glow like Echo red mute ring ---- */
+  .orb.muted {
+    background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--orb-muted) 35%, white), var(--orb-muted) 75%);
+    box-shadow: 0 0 28px color-mix(in srgb, var(--orb-muted) 60%, transparent);
+    animation: none;
+    border: 2px solid var(--orb-muted);
+  }
+
+  .blob.muted {
+    background: var(--coral-bg);
+    transform: scale(0.98);
+  }
+
+  .orb.muted .orb-core {
+    display: grid;
+    place-items: center;
+    color: var(--coral-text);
+    background: rgba(255, 255, 255, 0.9);
+    filter: none;
+  }
+
+  .orb.muted .ring {
+    color: var(--orb-muted);
+    border-color: var(--orb-muted);
+    opacity: 0.6;
+    animation: none;
   }
 
   /* Inner glow core */

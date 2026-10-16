@@ -1,91 +1,95 @@
 <script>
-  // FamilyBrief.svelte — illustrated summary panel
-  // Shows counts + raw text; this is a high-level overview.
+  import { Home, AlertTriangle, CheckCircle2 } from '@lucide/svelte';
+
   export let data = { raw: '', expiringCount: 0, tasksCount: 0 };
 </script>
 
-<div class="renderer" aria-label="Family briefing summary">
-  <h3 class="renderer-title">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-    </svg>
-    Family Briefing
-  </h3>
+<div class="brief-container" role="region" aria-label="Family briefing summary">
+  <div class="brief-header">
+    <Home size={16} class="header-icon" />
+    <span class="text-label uppercase">Family Briefing</span>
+  </div>
 
-  <!-- Summary counters -->
-  <div class="counters">
-    <div class="counter" class:warn={data.expiringCount > 0}>
-      <span class="counter-num">{data.expiringCount}</span>
-      <span class="counter-label">Documents expiring</span>
+  <!-- Summary metric status cards -->
+  <div class="metrics-row">
+    <div class="vr-status-card {data.expiringCount > 0 ? 'urgent' : 'ok'} metric-box">
+      <span class="text-number count">{data.expiringCount}</span>
+      <span class="text-small label">Documents expiring</span>
     </div>
-    <div class="counter" class:warn={data.tasksCount > 0}>
-      <span class="counter-num">{data.tasksCount}</span>
-      <span class="counter-label">Tasks due soon</span>
+    <div class="vr-status-card {data.tasksCount > 0 ? 'soon' : 'ok'} metric-box">
+      <span class="text-number count">{data.tasksCount}</span>
+      <span class="text-small label">Tasks due soon</span>
     </div>
   </div>
 
-  <!-- Raw text detail -->
+  <!-- Parsed brief narrative -->
   {#if data.raw}
-    <pre class="brief-text">{data.raw}</pre>
+    <div class="narrative-box">
+      <pre class="narrative-text text-body">{data.raw}</pre>
+    </div>
   {/if}
 
-  <p class="disclaimer">Guidance only. Verify on the official site.</p>
+  <p class="disclaimer text-label">Guidance only, verify on the official site.</p>
 </div>
 
 <style>
-  .renderer { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .brief-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-12);
+    width: 100%;
+  }
 
-  .renderer-title {
-    display: flex; align-items: center; gap: var(--sp-2);
-    font-size: 0.82rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em;
+  .brief-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-8);
     color: var(--text-muted);
   }
 
-  .counters {
+  .uppercase {
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .metrics-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--sp-3);
+    gap: var(--sp-12);
   }
 
-  .counter {
-    padding: var(--sp-4);
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--r-md);
-    display: flex; flex-direction: column; gap: 4px;
+  .metric-box {
+    padding: var(--sp-16);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     text-align: center;
-    transition: var(--theme-transition);
+    gap: var(--sp-4);
   }
 
-  .counter.warn {
-    background: var(--amber-bg);
-    border-color: var(--amber);
-  }
-
-  .counter-num {
-    font-family: var(--font-display);
-    font-size: 2rem; font-weight: 800;
+  .count {
     color: var(--text);
-    line-height: 1;
   }
 
-  .counter.warn .counter-num { color: var(--amber-text); }
+  .label {
+    color: var(--text-muted);
+  }
 
-  .counter-label { font-size: 0.72rem; color: var(--text-muted); }
-
-  .brief-text {
-    font-family: var(--font-body);
-    font-size: 0.84rem; color: var(--text-2);
-    white-space: pre-wrap; line-height: 1.6;
+  .narrative-box {
     background: var(--surface-2);
-    border-radius: var(--r-md);
-    padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--border);
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-card);
+    padding: var(--sp-16);
+  }
+
+  .narrative-text {
+    font-family: var(--font-ui);
+    color: var(--text);
+    white-space: pre-wrap;
+    line-height: var(--lh-body);
   }
 
   .disclaimer {
-    font-size: 0.68rem; color: var(--text-muted); opacity: 0.7;
-    border-top: 1px solid var(--border); padding-top: var(--sp-2);
+    color: var(--text-muted);
   }
 </style>
