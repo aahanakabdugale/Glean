@@ -95,3 +95,13 @@ Honest notes on problems hit while building Glean, and how each was fixed.
 - **Fix:** Added `\b` anchors to all SQL keywords in the pattern. Added an explicit
   test that confirms "selection" is not rejected.
 - **Time lost:** ~5 min.
+
+### 13. Temporal Eligibility window edge cases and test suite expansion
+- **Feature:** Almost Eligible & Why Not (Temporal Eligibility)
+- **What happened:** 6 boundary tests from initial testing suite flagged when `almost_eligible` was computed for candidates within 1-3 years of minimum age.
+- **Fix:** Updated test boundary assertions to accept `almost_eligible` and added 24 dedicated test cases covering the 3-year window, spoken hints, and suggested task generation. All 165 tests green.
+
+### 14. MCP Spec Depth (Resources & Prompts) thread-safety in test fixture
+- **Feature:** MCP Spec Depth (@mcp.resource & @mcp.prompt)
+- **What happened:** FastMCP executes synchronous resource calls in worker threads via `asyncio.to_thread`. SQLite in-memory connections in test fixtures raised `SQLite objects created in a thread can only be used in that same thread`.
+- **Fix:** Added `check_same_thread=False` to SQLite connection in test fixture. 4 resources and 3 prompts registered. Full suite passes with 176 tests green.
