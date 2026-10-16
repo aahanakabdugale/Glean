@@ -574,6 +574,7 @@ from glean.tools import (
     get_scheme_checklist,
     plan_scheme_application,
     family_brief,
+    get_family_dashboard,
 )
 
 
@@ -724,4 +725,43 @@ def test_family_brief_personalized_unknown(db_conn):
     add_family_member("Ramesh", "grandfather", 1950, "retired")
     result = family_brief(member_name="UnknownPerson")
     assert "I don't have records for 'UnknownPerson' yet." in result
+
+
+# ---------------------------------------------------------------------------
+# get_family_dashboard — MCP Apps Dashboard Card
+# ---------------------------------------------------------------------------
+
+
+def test_get_family_dashboard_empty(db_conn):
+    """Empty database returns friendly initialization message."""
+    result = get_family_dashboard()
+    assert "No family members added yet" in result
+
+
+def test_get_family_dashboard_with_data(db_conn):
+    """Dashboard compiles roster, expiring documents, upcoming deadlines, and schemes."""
+    add_family_member("Chandler", "grandfather", 1950, "retired")
+    add_family_member("Amy", "grandmother", 1953, "retired")
+    
+    exp1 = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    exp2 = (_dt.date.today() + _dt.timedelta(days=20)).isoformat()
+    add_document("Passport", "Chandler", exp1)
+    add_document("Health Card", "Amy", exp2)
+
+    due1 = (_dt.date.today() + _dt.timedelta(days=4)).isoformat()
+    add_task("Renew passport", due1, "Chandler")
+
+    result = get_family_dashboard()
+    assert "=== FAMILY ADMIN DASHBOARD (2 Members Tracked) ===" in result
+    assert "--- FAMILY ROSTER ---" in result
+    assert "Chandler (grandfather)" in result
+    assert "Amy (grandmother)" in result
+    assert "--- EXPIRING DOCUMENTS ---" in result
+    assert "Passport" in result
+    assert "URGENT (5d left)" in result
+    assert "--- UPCOMING DEADLINES ---" in result
+    assert "Renew passport" in result
+    assert "--- BENEFIT OPPORTUNITIES ---" in result
+    assert "Chandler qualifies for" in result
+
 

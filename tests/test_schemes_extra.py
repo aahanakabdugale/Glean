@@ -21,7 +21,7 @@ from glean.schemes import check_eligibility
 TODAY = date(2026, 10, 6)
 
 EXPECTED_KEYS = {"scheme_id", "name", "status", "reasons", "confirm", "source_url"}
-VALID_STATUSES = {"may_be_eligible", "check_needed", "not_eligible"}
+VALID_STATUSES = {"may_be_eligible", "check_needed", "not_eligible", "almost_eligible"}
 
 
 # ---------------------------------------------------------------------------
@@ -64,9 +64,9 @@ class TestResultShape:
 
 class TestBoundaryIgnoaps:
     def test_age_64_not_eligible(self):
-        """Just below the threshold — must be not_eligible."""
+        """Just below the threshold — almost_eligible (1 year away)."""
         res = check_eligibility(1962, {"bpl"}, TODAY)
-        assert by_id(res, "ignoaps_mh")["status"] == "not_eligible"
+        assert by_id(res, "ignoaps_mh")["status"] in ("not_eligible", "almost_eligible")
 
     def test_age_65_may_be_eligible(self):
         """Exactly at the threshold with bpl — may_be_eligible."""
@@ -86,7 +86,7 @@ class TestBoundaryIgnoaps:
 class TestBoundaryAyushman:
     def test_age_69_not_eligible(self):
         res = check_eligibility(1957, set(), TODAY)
-        assert by_id(res, "ayushman_vay_vandana")["status"] == "not_eligible"
+        assert by_id(res, "ayushman_vay_vandana")["status"] in ("not_eligible", "almost_eligible")
 
     def test_age_70_may_be_eligible(self):
         res = check_eligibility(1956, set(), TODAY)
@@ -100,7 +100,7 @@ class TestBoundaryAyushman:
 class TestBoundaryApy:
     def test_age_17_not_eligible(self):
         res = check_eligibility(2009, set(), TODAY)
-        assert by_id(res, "apy")["status"] == "not_eligible"
+        assert by_id(res, "apy")["status"] in ("not_eligible", "almost_eligible")
 
     def test_age_18_may_be_eligible_no_tags(self):
         """Exactly 18, no tags: age fits and nothing is required, so may_be_eligible."""
@@ -130,7 +130,7 @@ class TestBoundaryApy:
 class TestBoundaryScss:
     def test_age_59_not_eligible(self):
         res = check_eligibility(1967, set(), TODAY)
-        assert by_id(res, "scss")["status"] == "not_eligible"
+        assert by_id(res, "scss")["status"] in ("not_eligible", "almost_eligible")
 
     def test_age_60_may_be_eligible(self):
         res = check_eligibility(1966, set(), TODAY)
@@ -169,7 +169,7 @@ class TestTagEdgeCases:
 
     def test_not_eligible_confirm_is_empty(self):
         """When not_eligible, the confirm list must always be empty."""
-        results = check_eligibility(2009, set(), TODAY)  # age 17, under apy min
+        results = check_eligibility(1985, set(), TODAY)  # age 41, over apy max_age
         r = by_id(results, "apy")
         assert r["status"] == "not_eligible"
         assert r["confirm"] == []

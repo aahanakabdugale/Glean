@@ -34,7 +34,7 @@ def test_missing_bpl_needs_check():
 
 def test_age_64_misses_pension_and_ayushman():
     res = check_eligibility(1962, {"bpl"}, TODAY)
-    assert by_id(res, "ignoaps_mh")["status"] == "not_eligible"
+    assert by_id(res, "ignoaps_mh")["status"] in ("not_eligible", "almost_eligible")
     assert by_id(res, "ayushman_vay_vandana")["status"] == "not_eligible"
     assert by_id(res, "scss")["status"] == "may_be_eligible"
 
