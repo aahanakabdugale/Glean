@@ -232,7 +232,9 @@ def check_scheme_eligibility(name: str, tags: str = "") -> str:
             return f"I don't know anyone called {name}. Add them first."
 
         parsed_tags = {t.strip().lower() for t in tags.split(",") if t.strip()}
-        results = schemes.check_eligibility(member["birth_year"], parsed_tags)
+        results = schemes.check_eligibility(
+            member["birth_year"], parsed_tags, member_name=member["name"]
+        )
     except Exception as exc:
         logger.error("check_scheme_eligibility failed: %s", exc)
         return "Something went wrong. Please try again."
@@ -241,6 +243,10 @@ def check_scheme_eligibility(name: str, tags: str = "") -> str:
 
     eligible = [r for r in results if r["status"] == "may_be_eligible"]
     check_needed = [r for r in results if r["status"] == "check_needed"]
+    almost_eligible = sorted(
+        [r for r in results if r["status"] == "almost_eligible"],
+        key=lambda r: r.get("eligible_from_year", 0),
+    )
     not_eligible = [r for r in results if r["status"] == "not_eligible"]
 
     if eligible:
@@ -254,6 +260,14 @@ def check_scheme_eligibility(name: str, tags: str = "") -> str:
         for r in check_needed:
             confirm = "; ".join(r["confirm"])
             lines.append(f"• {r['name']} — {confirm}. Official link: {r['source_url']}")
+
+    if almost_eligible:
+        lines.append("\nComing up soon:")
+        for r in almost_eligible:
+            task = r.get("suggested_task", {})
+            lines.append(f"• {r['name']} — {r.get('spoken_hint', '')} Official link: {r['source_url']}")
+            if task:
+                lines.append(f"  -> Suggested: {task.get('title')} (around {task.get('due_year')})")
 
     if not_eligible:
         lines.append("\nNot eligible:")
@@ -449,8 +463,12 @@ def family_brief(member_name: str = "") -> str:
             ).fetchall()
 
             # Scheme eligibility evaluation
-            eligibility = schemes.check_eligibility(m_birth)
+            eligibility = schemes.check_eligibility(m_birth, member_name=m_name)
             eligible_schemes = [s for s in eligibility if s["status"] == "may_be_eligible"]
+            almost_schemes = sorted(
+                [s for s in eligibility if s["status"] == "almost_eligible"],
+                key=lambda s: s.get("eligible_from_year", 0),
+            )
             verify_schemes = [s for s in eligibility if s["status"] == "check_needed"]
 
         except Exception as exc:
@@ -488,6 +506,10 @@ def family_brief(member_name: str = "") -> str:
             for s in eligible_schemes:
                 lines.append(f"• {s['name']} (Official link: {s['source_url']})")
             lines.append("Ask me 'Plan the application' or 'What documents are needed' anytime!")
+        if almost_schemes:
+            lines.append("\nComing up soon (Temporal Eligibility):")
+            for s in almost_schemes:
+                lines.append(f"• {s['name']} — {s.get('spoken_hint', '')}")
         elif verify_schemes:
             lines.append("\nPotential Benefits (verification needed):")
             for s in verify_schemes:
@@ -550,3 +572,97 @@ def family_brief(member_name: str = "") -> str:
         lines.append("\nTasks: No tasks due in the next 14 days.")
 
     return "\n".join(lines)
+
+
+@mcp.tool()
+def get_family_dashboard() -> str:
+    """Generate an all-in-one family paperwork dashboard summarizing family roster,
+    document health, upcoming deadlines, and government scheme opportunities.
+    Designed for the MCP Apps Dashboard Card."""
+    today = datetime.date.today()
+    cutoff_docs = today + datetime.timedelta(days=60)
+    cutoff_tasks = today + datetime.timedelta(days=30)
+
+    try:
+        conn = db.get_connection()
+        members = conn.execute(
+            "SELECT id, name, relation, birth_year, status FROM family_members ORDER BY name"
+        ).fetchall()
+
+        if not members:
+            return "No family members added yet. Start by adding a member to initialize the dashboard."
+
+        docs = conn.execute(
+            "SELECT d.id, m.name, d.doc_type, d.expiry_date "
+            "FROM documents d JOIN family_members m ON m.id = d.member_id "
+            "ORDER BY d.expiry_date"
+        ).fetchall()
+
+        tasks = conn.execute(
+            "SELECT t.id, t.title, t.due_date, t.done, m.name "
+            "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+            "WHERE t.done = 0 "
+            "ORDER BY t.due_date"
+        ).fetchall()
+
+        # Compile metrics
+        total_members = len(members)
+        total_docs = len(docs)
+        expiring_docs = [d for d in docs if datetime.date.fromisoformat(d["expiry_date"]) <= cutoff_docs]
+        urgent_docs = [d for d in expiring_docs if (datetime.date.fromisoformat(d["expiry_date"]) - today).days <= 7]
+        upcoming_tasks = [t for t in tasks if datetime.date.fromisoformat(t["due_date"]) <= cutoff_tasks]
+        overdue_tasks = [t for t in tasks if (datetime.date.fromisoformat(t["due_date"]) - today).days < 0]
+
+        # Scheme opportunities across all members
+        scheme_matches = []
+        for m in members:
+            el_list = schemes.check_eligibility(m["birth_year"])
+            for s in el_list:
+                if s["status"] == "may_be_eligible":
+                    scheme_matches.append(f"{m['name']} qualifies for {s['name']}")
+
+        lines = [
+            f"=== FAMILY ADMIN DASHBOARD ({total_members} Members Tracked) ===",
+            f"• Documents: {total_docs} tracked ({len(expiring_docs)} expiring in 60d, {len(urgent_docs)} urgent)",
+            f"• Tasks: {len(tasks)} pending ({len(upcoming_tasks)} due in 30d, {len(overdue_tasks)} overdue)",
+            f"• Scheme Opportunities: {len(scheme_matches)} matches identified",
+            "",
+            "--- FAMILY ROSTER ---"
+        ]
+        for m in members:
+            lines.append(f"• {m['name']} ({m['relation']}) — Born {m['birth_year']}, {m['status']}")
+
+        if expiring_docs:
+            lines.append("\n--- EXPIRING DOCUMENTS ---")
+            for d in expiring_docs:
+                exp = datetime.date.fromisoformat(d["expiry_date"])
+                diff = (exp - today).days
+                tag = "EXPIRED" if diff < 0 else (f"URGENT ({diff}d left)" if diff <= 7 else f"{diff}d left")
+                lines.append(f"• {d['name']}'s {d['doc_type']} — expires {d['expiry_date']} [{tag}]")
+
+        if upcoming_tasks:
+            lines.append("\n--- UPCOMING DEADLINES ---")
+            for t in upcoming_tasks:
+                due = datetime.date.fromisoformat(t["due_date"])
+                diff = (due - today).days
+                tag = f"OVERDUE by {-diff}d" if diff < 0 else ("Due today" if diff == 0 else f"{diff}d left")
+                owner_info = f" ({t['name']})" if t['name'] else " (Household)"
+                lines.append(f"• {t['title']}{owner_info} — due {t['due_date']} [{tag}]")
+
+        if scheme_matches:
+            lines.append("\n--- BENEFIT OPPORTUNITIES ---")
+            for sm in scheme_matches[:5]:
+                lines.append(f"• {sm}")
+            if len(scheme_matches) > 5:
+                lines.append(f"• ... and {len(scheme_matches) - 5} more")
+
+        lines.append("\nNote: Guidance only. Verified on official portals.")
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.error("get_family_dashboard failed: %s", exc)
+        return "Something went wrong loading the dashboard. Please try again."
+
+
+# Ensure spec-depth MCP resources and prompts are registered with mcp server
+import glean.resources  # noqa: F401, E402
+import glean.prompts    # noqa: F401, E402
