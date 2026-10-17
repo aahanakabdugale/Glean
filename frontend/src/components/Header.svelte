@@ -1,12 +1,56 @@
 <script>
-  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList, alexaMicEnabled, toggleAlexaMic, toggleTracePanel, toolCallTraces, settings } from '../lib/store.js';
-  import { User, Users, Activity, Mic, MicOff, LayoutGrid, Settings, Sun, Moon, X, CheckCircle2, AlertCircle, RotateCw } from '@lucide/svelte';
-  import Logo from './Logo.svelte';
+  import {
+    theme,
+    toggleTheme,
+    connectionStatus,
+    activeView,
+    activePersona,
+    familyMembersList,
+    alexaMicEnabled,
+    toggleAlexaMic,
+    toggleTracePanel,
+    toolCallTraces,
+    settings
+  } from '../lib/store.js';
+  import {
+    User,
+    ChevronDown,
+    Activity,
+    LayoutGrid,
+    SlidersHorizontal,
+    Radio,
+    Mic,
+    MicOff,
+    Sun,
+    Moon,
+    X,
+    CheckCircle2,
+    AlertCircle,
+    RotateCw
+  } from '@lucide/svelte';
   import { testConnection } from '../lib/mcp.js';
 
+  let showUserMenu = false;
   let showStatusPopover = false;
   let testingConnection = false;
   let testResult = '';
+
+  // Persona helper data mapping
+  const personaRoles = {
+    all: 'Whole Family',
+    Chandler: 'Grandfather',
+    Amy: 'Grandmother',
+    Justin: 'Father',
+    Riley: 'Mother',
+    Jace: 'Son / Admin',
+    Gwen: 'Daughter / Admin'
+  };
+
+  $: currentRole = personaRoles[$activePersona] || (
+    $familyMembersList.find(m => m.name.toLowerCase() === ($activePersona || '').toLowerCase())?.relation || 'Member'
+  );
+
+  $: currentFirstName = $activePersona === 'all' ? 'All' : ($activePersona || 'User');
 
   async function runPingTest() {
     testingConnection = true;
@@ -22,8 +66,9 @@
   }
 
   function handleKeydown(e) {
-    if (e.key === 'Escape' && showStatusPopover) {
-      showStatusPopover = false;
+    if (e.key === 'Escape') {
+      if (showUserMenu) showUserMenu = false;
+      if (showStatusPopover) showStatusPopover = false;
     }
   }
 </script>
@@ -31,74 +76,253 @@
 <svelte:window on:keydown={handleKeydown} />
 
 <header class="top-bar">
-  <!-- Left: Glean Brand (Orb Icon + Wordmark) -->
-  <button class="brand-btn" on:click={() => activeView.set('chat')} aria-label="Go to Glean home">
-    <Logo size={32} fontSize={22} fontWeight={500} />
-  </button>
+  <!-- LEFT COLUMN: Brand Orb + Wordmark + User Switcher -->
+  <div class="col-left">
+    <button
+      class="brand-btn"
+      on:click={() => activeView.set('chat')}
+      aria-label="Glean home"
+    >
+      <div class="logo-orb" aria-hidden="true"></div>
+      <span class="logo-wordmark">glean</span>
+    </button>
 
-  <!-- Center: Member / Persona Switcher -->
-  <div class="center-group">
-    <div class="persona-pill" title="Filter perspective by family member">
-      {#if $activePersona === 'all'}
-        <Users size={16} class="persona-icon" aria-hidden="true" />
-      {:else}
-        <User size={16} class="persona-icon" aria-hidden="true" />
-      {/if}
-      <label for="persona-select" class="persona-label">Who:</label>
-      <select
-        id="persona-select"
-        class="persona-select"
-        bind:value={$activePersona}
-        aria-label="Active family member"
-      >
-        <option value="all">Whole Family</option>
-        <option value="Chandler">Chandler (Grandfather / 70+)</option>
-        <option value="Amy">Amy (Grandmother / 70+)</option>
-        <option value="Justin">Justin (Father / 50s)</option>
-        <option value="Riley">Riley (Mother / 50s)</option>
-        <option value="Jace">Jace (Son / Admin)</option>
-        <option value="Gwen">Gwen (Daughter / Admin)</option>
-        {#each $familyMembersList as m}
-          {#if !['chandler', 'amy', 'justin', 'riley', 'jace', 'gwen'].includes(m.name.toLowerCase())}
-            <option value={m.name}>{m.name} ({m.relation})</option>
-          {/if}
-        {/each}
-      </select>
-    </div>
-  </div>
-
-  <!-- Right: Status pills & Labeled Controls -->
-  <div class="right-group">
-    <!-- Server connection status Pill & Popover -->
-    <div class="status-pill-wrapper">
+    <!-- User Switcher Dropdown Button -->
+    <div class="user-switcher-wrap">
       <button
-        class="status-pill {$connectionStatus === 'online' ? 'ok' : 'soon'}"
-        class:active={showStatusPopover}
-        on:click={() => showStatusPopover = !showStatusPopover}
-        aria-label="Server status: {$connectionStatus}. Click for connection details."
-        aria-expanded={showStatusPopover}
-        title="MCP Server Status: {$connectionStatus === 'online' ? 'Live MCP HTTP (Connected)' : 'Demo Mode'} — Click for details"
+        type="button"
+        class="user-switcher-btn"
+        class:menu-open={showUserMenu}
+        on:click={() => {
+          showUserMenu = !showUserMenu;
+          if (showStatusPopover) showStatusPopover = false;
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={showUserMenu}
+        aria-label="Switch active family perspective: current user {currentFirstName}, role {currentRole}"
       >
-        <span class="status-dot"></span>
-        <span class="status-text">
-          {$connectionStatus === 'online' ? 'Live MCP HTTP' : 'Demo Mode'}
+        <span class="user-icon-wrap" aria-hidden="true">
+          <User size={16} strokeWidth={1.75} />
+        </span>
+        <span class="user-name">{currentFirstName}</span>
+        <span class="user-role">{currentRole}</span>
+        <span class="chevron-wrap" class:open={showUserMenu} aria-hidden="true">
+          <ChevronDown size={14} strokeWidth={1.75} />
         </span>
       </button>
 
-      {#if showStatusPopover}
-        <!-- Backdrop to close on click outside -->
+      {#if showUserMenu}
         <button
           type="button"
-          class="popover-backdrop"
+          class="dropdown-backdrop"
+          on:click={() => showUserMenu = false}
+          aria-label="Close user menu"
+          tabindex="-1"
+        ></button>
+
+        <ul class="user-dropdown-menu" role="listbox" aria-label="Family members">
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'all'}
+              role="option"
+              aria-selected={$activePersona === 'all'}
+              on:click={() => { $activePersona = 'all'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Whole Family</span>
+              <span class="opt-role">Overview</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Jace'}
+              role="option"
+              aria-selected={$activePersona === 'Jace'}
+              on:click={() => { $activePersona = 'Jace'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Jace</span>
+              <span class="opt-role">Son / Admin</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Gwen'}
+              role="option"
+              aria-selected={$activePersona === 'Gwen'}
+              on:click={() => { $activePersona = 'Gwen'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Gwen</span>
+              <span class="opt-role">Daughter / Admin</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Chandler'}
+              role="option"
+              aria-selected={$activePersona === 'Chandler'}
+              on:click={() => { $activePersona = 'Chandler'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Chandler</span>
+              <span class="opt-role">Grandfather (70+)</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Amy'}
+              role="option"
+              aria-selected={$activePersona === 'Amy'}
+              on:click={() => { $activePersona = 'Amy'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Amy</span>
+              <span class="opt-role">Grandmother (70+)</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Justin'}
+              role="option"
+              aria-selected={$activePersona === 'Justin'}
+              on:click={() => { $activePersona = 'Justin'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Justin</span>
+              <span class="opt-role">Father (50s)</span>
+            </button>
+          </li>
+          <li role="presentation">
+            <button
+              type="button"
+              class="user-option-btn"
+              class:selected={$activePersona === 'Riley'}
+              role="option"
+              aria-selected={$activePersona === 'Riley'}
+              on:click={() => { $activePersona = 'Riley'; showUserMenu = false; }}
+            >
+              <span class="opt-name">Riley</span>
+              <span class="opt-role">Mother (50s)</span>
+            </button>
+          </li>
+          {#each $familyMembersList as m}
+            {#if !['chandler', 'amy', 'justin', 'riley', 'jace', 'gwen'].includes(m.name.toLowerCase())}
+              <li role="presentation">
+                <button
+                  type="button"
+                  class="user-option-btn"
+                  class:selected={$activePersona === m.name}
+                  role="option"
+                  aria-selected={$activePersona === m.name}
+                  on:click={() => { $activePersona = m.name; showUserMenu = false; }}
+                >
+                  <span class="opt-name">{m.name}</span>
+                  <span class="opt-role">{m.relation || 'Member'}</span>
+                </button>
+              </li>
+            {/if}
+          {/each}
+        </ul>
+      {/if}
+    </div>
+  </div>
+
+  <!-- CENTER COLUMN: Segmented Navigation Control -->
+  <nav class="col-center" aria-label="Main application sections">
+    <div class="segmented-nav" role="tablist">
+      <!-- 1. Dashboard -->
+      <button
+        type="button"
+        class="seg-item"
+        class:active={$activeView === 'dashboard'}
+        role="tab"
+        aria-selected={$activeView === 'dashboard'}
+        aria-current={$activeView === 'dashboard' ? 'page' : undefined}
+        on:click={() => activeView.update(v => v === 'dashboard' ? 'chat' : 'dashboard')}
+      >
+        <span class="seg-icon" aria-hidden="true">
+          <LayoutGrid size={16} strokeWidth={1.75} />
+        </span>
+        <span class="seg-label">Dashboard</span>
+      </button>
+
+      <!-- 2. Traces -->
+      <button
+        type="button"
+        class="seg-item"
+        aria-label="Open Live MCP protocol traces drawer ({$toolCallTraces.length} recorded)"
+        on:click={toggleTracePanel}
+      >
+        <span class="seg-icon" aria-hidden="true">
+          <Activity size={16} strokeWidth={1.75} />
+        </span>
+        <span class="seg-label">Traces</span>
+        {#if $toolCallTraces.length > 0}
+          <span class="trace-badge" aria-label="{$toolCallTraces.length} traces">
+            {$toolCallTraces.length}
+          </span>
+        {/if}
+      </button>
+
+      <!-- 3. Settings -->
+      <button
+        type="button"
+        class="seg-item"
+        class:active={$activeView === 'settings'}
+        role="tab"
+        aria-selected={$activeView === 'settings'}
+        aria-current={$activeView === 'settings' ? 'page' : undefined}
+        on:click={() => activeView.update(v => v === 'settings' ? 'chat' : 'settings')}
+      >
+        <span class="seg-icon" aria-hidden="true">
+          <SlidersHorizontal size={16} strokeWidth={1.75} />
+        </span>
+        <span class="seg-label">Settings</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- RIGHT COLUMN: Live Status + Mic Toggle + Theme Toggle -->
+  <div class="col-right">
+    <!-- Live Status Indicator & Popover Trigger -->
+    <div class="live-status-wrap">
+      <button
+        type="button"
+        class="live-status-btn status-{$connectionStatus === 'online' ? 'connected' : ($connectionStatus === 'connecting' ? 'connecting' : 'disconnected')}"
+        class:popover-open={showStatusPopover}
+        on:click={() => {
+          showStatusPopover = !showStatusPopover;
+          if (showUserMenu) showUserMenu = false;
+        }}
+        aria-label="Server status: {$connectionStatus === 'online' ? 'Live Connected' : ($connectionStatus === 'connecting' ? 'Connecting' : 'Disconnected')}. Click for connection details."
+        aria-expanded={showStatusPopover}
+      >
+        <span class="status-icon-wrap" aria-hidden="true">
+          <Radio size={16} strokeWidth={1.75} />
+        </span>
+        <span class="live-label">Live</span>
+      </button>
+
+      {#if showStatusPopover}
+        <button
+          type="button"
+          class="dropdown-backdrop"
           on:click={() => showStatusPopover = false}
-          aria-label="Close connection status"
+          aria-label="Close server status details"
           tabindex="-1"
         ></button>
 
         <div class="status-popover" role="dialog" aria-label="MCP Server Connection Details">
           <div class="popover-header">
             <div class="popover-title-row">
-              <span class="status-dot {$connectionStatus === 'online' ? 'ok' : 'soon'}"></span>
+              <span class="status-dot-indicator status-{$connectionStatus === 'online' ? 'connected' : ($connectionStatus === 'connecting' ? 'connecting' : 'disconnected')}" aria-hidden="true"></span>
               <span class="popover-title">MCP Server Connection</span>
             </div>
             <button
@@ -107,14 +331,14 @@
               on:click={() => showStatusPopover = false}
               aria-label="Close"
             >
-              <X size={14} />
+              <X size={14} strokeWidth={1.75} />
             </button>
           </div>
 
           <div class="popover-body">
             <div class="popover-badge-row">
-              <span class="popover-status-badge {$connectionStatus === 'online' ? 'online' : 'demo'}">
-                {$connectionStatus === 'online' ? '● Live Streamable HTTP' : '● Demo Mode (Fallback)'}
+              <span class="popover-status-badge status-{$connectionStatus === 'online' ? 'connected' : ($connectionStatus === 'connecting' ? 'connecting' : 'disconnected')}">
+                {$connectionStatus === 'online' ? '● Live Streamable HTTP' : ($connectionStatus === 'connecting' ? '● Connecting...' : '● Disconnected / Demo Mode')}
               </span>
               {#if $connectionStatus === 'online'}
                 <span class="popover-stat-tag">Active</span>
@@ -149,9 +373,9 @@
             {#if testResult}
               <div class="test-feedback" class:ok={testResult.includes('success')}>
                 {#if testResult.includes('success')}
-                  <CheckCircle2 size={13} />
+                  <CheckCircle2 size={14} strokeWidth={1.75} />
                 {:else}
-                  <AlertCircle size={13} />
+                  <AlertCircle size={14} strokeWidth={1.75} />
                 {/if}
                 <span>{testResult}</span>
               </div>
@@ -165,7 +389,7 @@
               on:click={runPingTest}
               disabled={testingConnection}
             >
-              <RotateCw size={13} class={testingConnection ? 'spin' : ''} />
+              <RotateCw size={13} strokeWidth={1.75} class={testingConnection ? 'spin' : ''} />
               <span>{testingConnection ? 'Pinging…' : 'Ping Server'}</span>
             </button>
 
@@ -177,7 +401,7 @@
                 activeView.set('settings');
               }}
             >
-              <Settings size={13} />
+              <SlidersHorizontal size={13} strokeWidth={1.75} />
               <span>Server Settings</span>
             </button>
           </div>
@@ -185,232 +409,458 @@
       {/if}
     </div>
 
-    <!-- Trace drawer toggle -->
+    <!-- Mute / Unmute Button (38x38) -->
     <button
-      class="nav-btn"
-      on:click={toggleTracePanel}
-      aria-label="Open Live MCP protocol traces"
-      title="Live MCP Protocol Trace Panel"
-    >
-      <Activity size={15} />
-      <span class="nav-text">Traces</span>
-      {#if $toolCallTraces.length > 0}
-        <span class="trace-counter">{$toolCallTraces.length}</span>
-      {/if}
-    </button>
-
-    <!-- Alexa Mic hardware toggle -->
-    <button
-      class="nav-btn mic-btn"
+      type="button"
+      class="icon-ctrl-btn mute-btn"
       class:muted={!$alexaMicEnabled}
-      class:active-mic={$alexaMicEnabled}
       on:click={toggleAlexaMic}
-      aria-label={$alexaMicEnabled ? 'Mute Alexa microphone' : 'Unmute Alexa microphone'}
-      title={$alexaMicEnabled ? 'Alexa Mic is ON. Click to mute.' : 'Alexa Mic is MUTED. Click to unmute.'}
+      aria-label={$alexaMicEnabled ? 'Mute' : 'Unmute'}
+      title={$alexaMicEnabled ? 'Microphone is active. Click to mute.' : 'Microphone is muted. Click to unmute.'}
     >
       {#if $alexaMicEnabled}
-        <Mic size={15} />
-        <span class="nav-text">Mic ON</span>
+        <Mic size={18} strokeWidth={1.75} aria-hidden="true" />
       {:else}
-        <MicOff size={15} />
-        <span class="nav-text">Muted</span>
+        <MicOff size={18} strokeWidth={1.75} aria-hidden="true" />
       {/if}
     </button>
 
-    <!-- Dashboard View toggle -->
+    <!-- Theme Toggle (38x38) -->
     <button
-      class="nav-btn"
-      class:active={$activeView === 'dashboard'}
-      on:click={() => activeView.update(v => v === 'dashboard' ? 'chat' : 'dashboard')}
-      aria-label="Toggle family dashboard"
-      title="Family Admin Dashboard"
-    >
-      <LayoutGrid size={15} />
-      <span class="nav-text">Dashboard</span>
-    </button>
-
-    <!-- Settings modal toggle -->
-    <button
-      class="nav-btn"
-      class:active={$activeView === 'settings'}
-      on:click={() => activeView.update(v => v === 'settings' ? 'chat' : 'settings')}
-      aria-label="Settings"
-      title="System Settings"
-    >
-      <Settings size={15} />
-      <span class="nav-text">Settings</span>
-    </button>
-
-    <!-- Theme toggle (Dark / Light) -->
-    <button
-      class="icon-btn theme-toggle"
+      type="button"
+      class="icon-ctrl-btn theme-btn"
       on:click={toggleTheme}
-      aria-label="Toggle theme between light and dark"
-      title="Toggle Theme"
+      aria-label={$theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+      title={$theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
     >
       {#if $theme === 'dark'}
-        <Sun size={16} />
+        <Sun size={18} strokeWidth={1.75} aria-hidden="true" />
       {:else}
-        <Moon size={16} />
+        <Moon size={18} strokeWidth={1.75} aria-hidden="true" />
       {/if}
     </button>
   </div>
 </header>
 
 <style>
+  /* ================= TOP NAVIGATION BAR ================= */
   .top-bar {
-    display: flex;
+    width: 100%;
+    height: 72px;
+    background: var(--bar-bg);
+    border-bottom: 1px solid var(--bar-border);
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
-    height: 60px;
-    padding: 0 var(--sp-16);
-    background: var(--surface);
-    border-bottom: 1px solid var(--line-soft);
+    padding: 0 20px;
     position: relative;
     z-index: 40;
-    transition: border-color var(--dur-base) var(--ease), background-color var(--dur-base) var(--ease);
+    box-sizing: border-box;
+    font-family: 'Outfit', 'Outfit Variable', system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--bar-text, var(--text));
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    .top-bar,
+    .top-bar * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+
+  /* ---------------- COLUMN 1: LEFT ---------------- */
+  .col-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  /* Brand Orb + Wordmark */
   .brand-btn {
     display: inline-flex;
     align-items: center;
+    gap: 10px;
     border: none;
     background: transparent;
     cursor: pointer;
-    padding: 0;
+    padding: 4px 6px;
+    border-radius: 8px;
     text-decoration: none;
-    transition: transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
+    flex-shrink: 0;
+    transition: opacity 150ms ease, transform 150ms ease;
   }
   .brand-btn:hover {
-    transform: scale(1.02);
-    opacity: 0.95;
+    opacity: 0.92;
+    transform: translateY(-0.5px);
   }
   .brand-btn:focus-visible {
-    outline: 2px solid var(--logo-core);
-    outline-offset: 4px;
-    border-radius: 6px;
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
   }
 
-  .center-group {
-    display: flex;
-    align-items: center;
-  }
-
-  .persona-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-8);
-    height: var(--btn-height);
-    padding: 0 var(--sp-16);
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--r-pill);
-    box-shadow: var(--shadow-card);
-  }
-
-  :global(.persona-icon) {
-    color: var(--text-muted);
+  /* 28px Circle Logo Orb */
+  .logo-orb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #9fd0ff 0%, #3b6ff5 50%, #1a2f8a 100%);
+    box-shadow: 0 0 0 4px var(--logo-glow);
     flex-shrink: 0;
   }
 
-  .persona-label {
-    font-size: var(--fs-label);
-    font-weight: 500;
-    color: var(--text-muted);
+  .logo-wordmark {
+    font-family: 'Outfit', 'Outfit Variable', system-ui, -apple-system, sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--bar-text, var(--text));
+    letter-spacing: -0.01em;
+    line-height: 1;
   }
 
-  .persona-select {
-    border: none;
-    background: transparent;
-    font-family: var(--font-ui);
-    font-size: var(--fs-small);
-    font-weight: 500;
-    color: var(--text);
-    cursor: pointer;
-    outline: none;
-    color-scheme: inherit;
-  }
-
-  .persona-select option {
-    background-color: var(--surface, #0C1424);
-    color: var(--text, #E8F4FF);
-    font-family: var(--font-ui);
-    font-size: var(--fs-small);
-    padding: 6px 12px;
-  }
-
-  .right-group {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-  }
-
-  /* Status Pill */
-  .status-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-8);
-    height: 32px;
-    padding: 0 var(--sp-12);
-    border-radius: var(--r-pill);
-    border: 1px solid var(--line-soft);
-    background: var(--surface);
-    font-size: var(--fs-label);
-    font-weight: 500;
-    cursor: pointer;
-    color: var(--text-soft);
-    transition: all var(--dur-fast) var(--ease);
-  }
-  .status-pill:hover {
-    border-color: var(--line);
-  }
-
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-  .status-pill.ok .status-dot {
-    background: var(--ok);
-  }
-  .status-pill.soon .status-dot {
-    background: var(--soon);
-  }
-  .status-pill.active {
-    border-color: var(--accent);
-    background: var(--surface-2);
-  }
-
-  /* Status Pill Popover */
-  .status-pill-wrapper {
+  /* User Switcher */
+  .user-switcher-wrap {
     position: relative;
     display: inline-flex;
-    align-items: center;
   }
 
-  .popover-backdrop {
+  .user-switcher-btn {
+    height: 38px;
+    min-width: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--ctrl-border);
+    background: transparent;
+    color: var(--ctrl-text);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+    white-space: nowrap;
+  }
+  .user-switcher-btn:hover {
+    background: var(--ctrl-hover-bg);
+  }
+  .user-switcher-btn:active {
+    filter: brightness(0.92);
+  }
+  .user-switcher-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .user-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--ctrl-text);
+  }
+
+  .user-name {
+    color: var(--bar-text, var(--text));
+    font-weight: 500;
+  }
+
+  .user-role {
+    color: var(--bar-text-muted, var(--text-muted));
+    font-size: 12px;
+    font-weight: 400;
+  }
+
+  .chevron-wrap {
+    display: inline-flex;
+    align-items: center;
+    color: var(--bar-text-muted, var(--text-muted));
+    transition: transform 150ms ease;
+  }
+  .chevron-wrap.open {
+    transform: rotate(180deg);
+  }
+
+  /* Dropdown Popover Backdrop */
+  .dropdown-backdrop {
     position: fixed;
     inset: 0;
-    z-index: 90;
+    z-index: 85;
     background: transparent;
     border: none;
     cursor: default;
+    padding: 0;
+    margin: 0;
   }
 
+  .user-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 200px;
+    background: var(--bar-bg);
+    border: 1px solid var(--bar-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+    z-index: 90;
+    padding: 6px;
+    margin: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  :global([data-theme="light"]) .user-dropdown-menu {
+    box-shadow: 0 8px 24px rgba(11, 18, 32, 0.12);
+  }
+
+  .user-option-btn {
+    width: 100%;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--bar-text, var(--text));
+    text-align: left;
+    transition: background-color 150ms ease;
+  }
+  .user-option-btn:hover {
+    background: var(--ctrl-hover-bg);
+  }
+  .user-option-btn.selected {
+    background: var(--seg-active-bg);
+    color: var(--seg-active-text);
+    font-weight: 600;
+  }
+  .opt-name {
+    font-weight: 500;
+  }
+  .opt-role {
+    font-size: 11px;
+    color: var(--bar-text-muted, var(--text-muted));
+  }
+  .user-option-btn.selected .opt-role {
+    color: var(--seg-active-text);
+    opacity: 0.8;
+  }
+
+  /* ---------------- COLUMN 2: CENTER (SEGMENTED NAV) ---------------- */
+  .col-center {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .segmented-nav {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--seg-bg);
+    border: 1px solid var(--seg-border);
+    box-sizing: border-box;
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+
+  .seg-item {
+    height: 34px;
+    padding: 0 16px;
+    border-radius: 10px;
+    border: none;
+    background: transparent;
+    color: var(--nav-text);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    position: relative;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  }
+  .seg-item:hover {
+    color: var(--bar-text, var(--text));
+    background: var(--ctrl-hover-bg);
+  }
+  .seg-item:active {
+    filter: brightness(0.92);
+  }
+  .seg-item:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .seg-item.active {
+    background: var(--seg-active-bg);
+    color: var(--seg-active-text);
+    box-shadow: inset 0 0 0 1px var(--seg-active-ring);
+  }
+
+  :global([data-theme="light"]) .seg-item.active {
+    box-shadow: inset 0 0 0 1px var(--seg-active-ring), 0 1px 2px rgba(11, 18, 32, 0.12);
+  }
+
+  .seg-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .seg-label {
+    line-height: 1;
+  }
+
+  /* Traces Count Badge */
+  .trace-badge {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: var(--badge-bg);
+    color: var(--badge-text);
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    letter-spacing: -0.02em;
+    margin-left: -2px;
+  }
+
+  /* ---------------- COLUMN 3: RIGHT CLUSTER ---------------- */
+  .col-right {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  /* Live Status Button */
+  .live-status-wrap {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .live-status-btn {
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 12px;
+    border: 1px solid var(--ctrl-border);
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .live-status-btn:hover {
+    background: var(--ctrl-hover-bg);
+  }
+  .live-status-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  .live-status-btn.status-connected {
+    color: var(--live);
+  }
+  .live-status-btn.status-connecting {
+    color: var(--warn);
+  }
+  .live-status-btn.status-disconnected {
+    color: var(--danger);
+  }
+
+  .status-icon-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .live-label {
+    font-weight: 600;
+  }
+
+  /* Icon-Only Buttons (38x38) */
+  .icon-ctrl-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    border: 1px solid var(--ctrl-border);
+    background: transparent;
+    color: var(--ctrl-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 0;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+  }
+  .icon-ctrl-btn:hover {
+    background: var(--ctrl-hover-bg);
+    color: var(--bar-text, var(--text));
+  }
+  .icon-ctrl-btn:active {
+    filter: brightness(0.92);
+  }
+  .icon-ctrl-btn:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* Mute Active State (Danger tokens) */
+  .mute-btn.muted {
+    background: var(--danger-bg);
+    border-color: var(--danger-border);
+    color: var(--danger);
+  }
+  .mute-btn.muted:hover {
+    background: var(--danger-bg);
+    filter: brightness(1.12);
+  }
+
+  /* ---------------- STATUS POPOVER ---------------- */
   .status-popover {
     position: absolute;
     top: calc(100% + 8px);
     right: 0;
     width: 320px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--r-card, 12px);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    background: var(--bar-bg);
+    border: 1px solid var(--bar-border);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
     z-index: 100;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     animation: popoverFadeIn 140ms ease-out;
+  }
+
+  :global([data-theme="light"]) .status-popover {
+    box-shadow: 0 10px 28px rgba(11, 18, 32, 0.12);
   }
 
   @keyframes popoverFadeIn {
@@ -429,8 +879,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 14px;
-    border-bottom: 1px solid var(--line-soft);
-    background: var(--surface-2);
+    border-bottom: 1px solid var(--bar-border);
+    background: var(--seg-bg);
   }
 
   .popover-title-row {
@@ -439,27 +889,45 @@
     gap: 8px;
   }
 
+  .status-dot-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+  .status-dot-indicator.status-connected {
+    background: var(--live);
+    box-shadow: 0 0 6px var(--live);
+  }
+  .status-dot-indicator.status-connecting {
+    background: var(--warn);
+    box-shadow: 0 0 6px var(--warn);
+  }
+  .status-dot-indicator.status-disconnected {
+    background: var(--danger);
+    box-shadow: 0 0 6px var(--danger);
+  }
+
   .popover-title {
     font-size: 13px;
     font-weight: 600;
-    color: var(--text);
+    color: var(--bar-text, var(--text));
   }
 
   .popover-close-btn {
     border: none;
     background: transparent;
-    color: var(--text-muted);
+    color: var(--bar-text-muted, var(--text-muted));
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 4px;
     border-radius: 4px;
-    transition: color 0.15s ease, background-color 0.15s ease;
+    transition: color 150ms ease, background-color 150ms ease;
   }
   .popover-close-btn:hover {
-    color: var(--text);
-    background: var(--line-soft);
+    color: var(--bar-text, var(--text));
+    background: var(--ctrl-hover-bg);
   }
 
   .popover-body {
@@ -478,26 +946,31 @@
   .popover-status-badge {
     font-size: 11px;
     font-weight: 600;
-    padding: 2px 8px;
-    border-radius: var(--r-pill);
+    padding: 3px 8px;
+    border-radius: 999px;
     display: inline-flex;
     align-items: center;
     gap: 4px;
   }
-  .popover-status-badge.online {
-    background: var(--ok-bg);
-    color: var(--ok-text);
-    border: 1px solid var(--ok);
+  .popover-status-badge.status-connected {
+    background: rgba(110, 231, 183, 0.14);
+    color: var(--live);
+    border: 1px solid var(--live);
   }
-  .popover-status-badge.demo {
-    background: var(--soon-bg);
-    color: var(--soon-text);
-    border: 1px solid var(--soon);
+  .popover-status-badge.status-connecting {
+    background: rgba(251, 191, 36, 0.14);
+    color: var(--warn);
+    border: 1px solid var(--warn);
+  }
+  .popover-status-badge.status-disconnected {
+    background: var(--danger-bg);
+    color: var(--danger);
+    border: 1px solid var(--danger-border);
   }
 
   .popover-stat-tag {
     font-size: 11px;
-    color: var(--text-muted);
+    color: var(--bar-text-muted, var(--text-muted));
     font-weight: 500;
   }
 
@@ -505,8 +978,8 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
-    background: var(--surface-2);
-    border: 1px solid var(--line-soft);
+    background: var(--seg-bg);
+    border: 1px solid var(--bar-border);
     border-radius: 8px;
     padding: 10px 12px;
   }
@@ -522,13 +995,13 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: var(--text-muted);
+    color: var(--bar-text-muted, var(--text-muted));
   }
 
   .info-val {
     font-size: 12px;
     font-weight: 500;
-    color: var(--text);
+    color: var(--bar-text, var(--text));
   }
   .info-val.mono {
     font-family: var(--font-mono);
@@ -544,12 +1017,12 @@
     font-weight: 500;
     padding: 6px 10px;
     border-radius: 6px;
-    background: var(--soon-bg);
-    color: var(--soon-text);
+    background: rgba(251, 191, 36, 0.14);
+    color: var(--warn);
   }
   .test-feedback.ok {
-    background: var(--ok-bg);
-    color: var(--ok-text);
+    background: rgba(110, 231, 183, 0.14);
+    color: var(--live);
   }
 
   .popover-footer {
@@ -557,8 +1030,8 @@
     align-items: center;
     gap: 8px;
     padding: 10px 14px;
-    border-top: 1px solid var(--line-soft);
-    background: var(--surface-2);
+    border-top: 1px solid var(--bar-border);
+    background: var(--seg-bg);
   }
 
   .popover-action-btn {
@@ -567,31 +1040,30 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    height: 30px;
+    height: 32px;
     padding: 0 10px;
-    border-radius: 6px;
+    border-radius: 8px;
     font-size: 12px;
     font-weight: 500;
-    font-family: var(--font-ui);
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 150ms ease;
   }
   .popover-action-btn.secondary {
-    border: 1px solid var(--line-soft);
-    background: var(--surface);
-    color: var(--text);
+    border: 1px solid var(--ctrl-border);
+    background: var(--bar-bg);
+    color: var(--ctrl-text);
   }
   .popover-action-btn.secondary:hover {
-    border-color: var(--line);
-    background: var(--surface-2);
+    background: var(--ctrl-hover-bg);
   }
   .popover-action-btn.primary {
-    border: 1px solid var(--accent);
-    background: var(--accent);
-    color: var(--btn-primary-text, #fff);
+    border: 1px solid var(--seg-active-ring);
+    background: var(--seg-active-ring);
+    color: #ffffff;
   }
   .popover-action-btn.primary:hover {
-    background: var(--accent-2);
+    filter: brightness(1.1);
   }
 
   :global(.spin) {
@@ -602,105 +1074,34 @@
     to { transform: rotate(360deg); }
   }
 
-  @media (max-width: 720px) {
-    .status-text {
+  /* ---------------- RESPONSIVE BREAKPOINT (<900px) ---------------- */
+  @media (max-width: 900px) {
+    .user-role {
       display: none;
     }
-    .status-pill {
-      padding: 0 var(--sp-8);
-    }
-  }
-
-  /* Navigation Labeled Buttons */
-  .nav-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--sp-6);
-    height: 34px;
-    padding: 0 var(--sp-12);
-    border-radius: var(--r-pill);
-    border: 1px solid var(--line-soft);
-    background: var(--surface);
-    color: var(--text-soft);
-    font-family: var(--font-ui);
-    font-size: var(--fs-small);
-    font-weight: 500;
-    cursor: pointer;
-    position: relative;
-    transition: all var(--dur-fast) var(--ease);
-    white-space: nowrap;
-    text-decoration: none;
-  }
-  .nav-btn:hover {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--line);
-  }
-  .nav-btn.active {
-    background: var(--surface-2);
-    color: var(--accent);
-    border-color: var(--accent);
-    font-weight: 600;
-  }
-  .nav-btn.mic-btn.muted {
-    background: var(--urgent-bg);
-    color: var(--urgent-text);
-    border-color: var(--urgent);
-  }
-  .nav-btn.mic-btn.active-mic {
-    background: var(--ok-bg);
-    color: var(--ok-text);
-    border-color: var(--ok);
-  }
-  .nav-text {
-    font-size: 13px;
-    line-height: 1;
-  }
-
-  /* Theme Toggle Icon Button */
-  .icon-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: var(--r-pill);
-    border: 1px solid var(--line-soft);
-    background: var(--surface);
-    color: var(--text-muted);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all var(--dur-fast) var(--ease);
-    flex-shrink: 0;
-  }
-  .icon-btn:hover {
-    background: var(--surface-2);
-    color: var(--text);
-    border-color: var(--line);
-  }
-
-  .trace-counter {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 4px;
-    border-radius: var(--r-pill);
-    background: var(--accent);
-    color: var(--btn-primary-text);
-    font-size: 10px;
-    font-weight: 600;
-    line-height: 1;
-  }
-
-  @media (max-width: 1024px) {
-    .nav-text {
+    .seg-label {
       display: none;
     }
-    .nav-btn {
-      padding: 0 var(--sp-8);
-      width: 34px;
-      justify-content: center;
+    .seg-item {
+      padding: 0 10px;
+    }
+    .live-label {
+      display: none;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .top-bar {
+      padding: 0 12px;
+    }
+    .user-name {
+      display: none;
+    }
+    .user-switcher-btn {
+      padding: 0 8px;
+    }
+    .brand-btn .logo-wordmark {
+      display: none;
     }
   }
 </style>

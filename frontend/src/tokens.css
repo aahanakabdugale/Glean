@@ -60,6 +60,30 @@
   --logo-core: #2F6BEB;
   --logo-shine: #FFFFFF;
   --logo-text: #1B2236;
+
+  /* Top Navigation Bar Tokens (Light Theme) */
+  --bar-bg: #f5f7fb;
+  --bar-border: #d5dcea;
+  --bar-text: #0b1220;
+  --bar-text-muted: #5b6a86;
+  --nav-text: #3d4b66;
+  --seg-bg: #e8edf6;
+  --seg-border: #d5dcea;
+  --seg-active-bg: #ffffff;
+  --seg-active-text: #0b1220;
+  --seg-active-ring: #2f5bea;
+  --ctrl-border: #c3cde0;
+  --ctrl-text: #3d4b66;
+  --ctrl-hover-bg: #e8edf6;
+  --badge-bg: #0e7490;
+  --badge-text: #ffffff;
+  --live: #047857;
+  --warn: #b45309;
+  --danger: #b4232a;
+  --danger-bg: rgba(180,35,42,.08);
+  --danger-border: rgba(180,35,42,.45);
+  --focus: #2f5bea;
+  --logo-glow: rgba(59,111,245,.25);
 }
 
 [data-theme="dark"] {
@@ -117,6 +141,30 @@
   --logo-core: #4F86F7;
   --logo-shine: #FFFFFF;
   --logo-text: #F1F5FF;
+
+  /* Top Navigation Bar Tokens (Dark Theme) */
+  --bar-bg: #070c18;
+  --bar-border: #16203a;
+  --bar-text: #dbe6ff;
+  --bar-text-muted: #7f93ba;
+  --nav-text: #9fb2d6;
+  --seg-bg: #0d1628;
+  --seg-border: #1d2a47;
+  --seg-active-bg: #1f3160;
+  --seg-active-text: #ffffff;
+  --seg-active-ring: #3a58a8;
+  --ctrl-border: #243255;
+  --ctrl-text: #c5d3f0;
+  --ctrl-hover-bg: #121c33;
+  --badge-bg: #22d3ee;
+  --badge-text: #04121a;
+  --live: #6ee7b7;
+  --warn: #fbbf24;
+  --danger: #ff8a8a;
+  --danger-bg: rgba(255,107,107,.10);
+  --danger-border: rgba(255,107,107,.50);
+  --focus: #3a58a8;
+  --logo-glow: rgba(59,111,245,.20);
 }
 
 /* ---------- SHARED SCALES (THEME-INDEPENDENT) ---------- */
