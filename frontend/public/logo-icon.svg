@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <style>
+    :root {
+      --logo-halo: #E3EDFD;
+      --logo-ring: #A9C7FA;
+      --logo-core: #2F6BEB;
+      --logo-shine: #FFFFFF;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --logo-halo: rgba(79, 134, 247, 0.16);
+        --logo-ring: rgba(79, 134, 247, 0.38);
+        --logo-core: #4F86F7;
+        --logo-shine: #FFFFFF;
+      }
+    }
+  </style>
+  <!-- Concentric circles centered at (24, 24) -->
+  <!-- 1. Outer halo: r=24 -->
+  <circle cx="24" cy="24" r="24" fill="var(--logo-halo)"/>
+  <!-- 2. Middle ring: r=18 -->
+  <circle cx="24" cy="24" r="18" fill="var(--logo-ring)"/>
+  <!-- 3. Core: r=12, brand blue -->
+  <circle cx="24" cy="24" r="12" fill="var(--logo-core)"/>
+  <!-- Glossy highlight on core -->
+  <ellipse cx="20.5" cy="19" rx="5" ry="3" fill="var(--logo-shine)" opacity="0.6"/>
+</svg>

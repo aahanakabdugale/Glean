@@ -1,18 +1,22 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
-  <defs>
-    <linearGradient id="favicon-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#4285F4" />
-      <stop offset="100%" stop-color="#1A73E8" />
-    </linearGradient>
-  </defs>
-  <!-- Rounded Squircle -->
-  <rect width="32" height="32" rx="9" fill="url(#favicon-grad)"/>
-  <!-- Layered Paperwork Sheets -->
-  <rect x="7" y="6" width="13" height="17" rx="2.5" fill="white" opacity="0.45"/>
-  <rect x="11" y="9" width="14" height="17" rx="2.5" fill="white"/>
-  <!-- Content Lines -->
-  <path d="M14 13.5H21.5" stroke="#1A73E8" stroke-width="1.8" stroke-linecap="round"/>
-  <path d="M14 17H19.5" stroke="#1A73E8" stroke-width="1.8" stroke-linecap="round"/>
-  <!-- Accent Sparkle -->
-  <path d="M8 19C9.5 19 10.5 18 10.5 16.5C10.5 18 11.5 19 13 19C11.5 19 10.5 20 10.5 21.5C10.5 20 9.5 19 8 19Z" fill="white" opacity="0.95"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 6 36 36" fill="none">
+  <style>
+    :root {
+      --fav-ring: #A9C7FA;
+      --fav-core: #2F6BEB;
+      --fav-shine: #FFFFFF;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fav-ring: rgba(79, 134, 247, 0.45);
+        --fav-core: #4F86F7;
+        --fav-shine: #FFFFFF;
+      }
+    }
+  </style>
+  <!-- Middle Ring (r=18) -->
+  <circle cx="24" cy="24" r="18" fill="var(--fav-ring)"/>
+  <!-- Core (r=12) -->
+  <circle cx="24" cy="24" r="12" fill="var(--fav-core)"/>
+  <!-- Glossy highlight on core -->
+  <ellipse cx="20.5" cy="19" rx="5" ry="3" fill="var(--fav-shine)" opacity="0.6"/>
 </svg>
