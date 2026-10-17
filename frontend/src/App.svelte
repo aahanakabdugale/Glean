@@ -10,12 +10,27 @@
   import TracePanel    from './components/TracePanel.svelte';
 
   import { onMount } from 'svelte';
-  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList, showTracePanel, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert } from './lib/store.js';
+  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList, showTracePanel, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert, alexaMicEnabled } from './lib/store.js';
   import * as mcp from './lib/mcp.js';
   import { cleanTextForSpeech } from './lib/speech.js';
 
+  // Pending speech queue: if an ambient alert arrives while muted, speak it when unmuted
+  let pendingAmbientSpeech = null;
+
+  $: if ($alexaMicEnabled && pendingAmbientSpeech && $activeAmbientAlert) {
+    const textToSpeak = pendingAmbientSpeech;
+    pendingAmbientSpeech = null;
+    playAmbientChime();
+    speak(textToSpeak);
+  } else if (!$alexaMicEnabled) {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+  }
+
   // Ambient audio chime for proactive notifications
   function playAmbientChime() {
+    if (!$alexaMicEnabled) return;
     try {
       const AudioCtx = window.AudioContext || window.webkitAudioContext;
       if (!AudioCtx) return;
@@ -47,9 +62,16 @@
     // Connect to server-sent ambient push stream
     const sse = mcp.initAmbientSSE((alertData) => {
       pushAmbientAlert(alertData);
-      playAmbientChime();
-      if ($settings.voiceEnabled && alertData.speech) {
-        speak(alertData.speech);
+      if ($alexaMicEnabled) {
+        playAmbientChime();
+        if ($settings.voiceEnabled && alertData.speech) {
+          speak(alertData.speech);
+        }
+      } else {
+        // Retain alert speech so when the user un-mutes, it speaks
+        if (alertData.speech) {
+          pendingAmbientSpeech = alertData.speech;
+        }
       }
     });
 
@@ -60,7 +82,7 @@
 
   // TTS
   function speak(text) {
-    if (!$settings.voiceEnabled) return;
+    if (!$alexaMicEnabled || !$settings.voiceEnabled) return;
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const clean = cleanTextForSpeech(text);
@@ -227,28 +249,11 @@
   <!-- Top bar on every page -->
   <Header />
 
-  <!-- Live Ambient Proactive Push Banner -->
+  <!-- Live Ambient Proactive Push Card (Bottom-Right Floating Box) -->
   {#if $activeAmbientAlert}
-    <div class="ambient-push-banner" role="alert" aria-live="assertive">
-      <div class="ambient-push-content">
-        <span class="ambient-push-badge">⚡ PROACTIVE AMBIENT PUSH</span>
-        <div class="ambient-push-message">
-          <strong class="ambient-push-title">{$activeAmbientAlert.display || 'Urgent Deadline Detected'}</strong>
-          <span class="ambient-push-sub">{$activeAmbientAlert.speech || ''}</span>
-        </div>
-      </div>
-      <div class="ambient-push-actions">
-        <button
-          type="button"
-          class="ambient-action-btn"
-          on:click={() => {
-            const prompt = $activeAmbientAlert.suggested_action || 'What documents are expiring soon?';
-            dismissAmbientAlert();
-            handleSend(prompt);
-          }}
-        >
-          Fix Now
-        </button>
+    <aside class="ambient-push-card" role="alert" aria-live="assertive">
+      <div class="ambient-push-header">
+        <span class="ambient-push-badge">⚡ URGENT ALERT</span>
         <button
           type="button"
           class="ambient-dismiss-btn"
@@ -258,7 +263,28 @@
           ✕
         </button>
       </div>
-    </div>
+
+      <div class="ambient-push-body">
+        <strong class="ambient-push-title">{$activeAmbientAlert.display || 'Urgent Deadline Detected'}</strong>
+        {#if $activeAmbientAlert.speech}
+          <p class="ambient-push-desc">{$activeAmbientAlert.speech}</p>
+        {/if}
+      </div>
+
+      <div class="ambient-push-footer">
+        <button
+          type="button"
+          class="ambient-action-btn"
+          on:click={() => {
+            const prompt = $activeAmbientAlert.suggested_action || 'What documents are expiring soon?';
+            dismissAmbientAlert();
+            handleSend(prompt);
+          }}
+        >
+          Fix Now →
+        </button>
+      </div>
+    </aside>
   {/if}
 
   <!-- Main content area -->
@@ -307,7 +333,7 @@
     width: 100%;
     max-width: 1400px;
     margin: 0 auto;
-    padding: var(--sp-16) var(--sp-24) 0 var(--sp-24);
+    padding: var(--sp-24) var(--sp-24) 0 var(--sp-24);
   }
 
   .settings-view .main-content {
@@ -331,29 +357,37 @@
     font-size: var(--fs-label);
   }
 
-  /* Ambient Proactive Push Banner */
-  .ambient-push-banner {
-    width: calc(100% - 32px);
-    max-width: 1200px;
-    margin: var(--sp-12) auto 0 auto;
-    padding: var(--sp-12) var(--sp-16);
-    background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(6, 182, 212, 0.08));
-    border: 1px solid rgba(245, 158, 11, 0.4);
-    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15), 0 0 15px rgba(245, 158, 11, 0.1);
-    border-radius: var(--rad-base);
+  /* Ambient Proactive Push Card (Bottom-Right Floating Square Box) */
+  .ambient-push-card {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 310px;
+    background: var(--surface, #ffffff);
+    background: linear-gradient(160deg, rgba(239, 68, 68, 0.08) 0%, var(--surface, #ffffff) 55%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid rgba(239, 68, 68, 0.45);
+    box-shadow: 0 12px 36px rgba(239, 68, 68, 0.22), 0 2px 10px rgba(0, 0, 0, 0.1);
+    border-radius: 18px;
+    padding: 16px;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-16);
-    animation: ambient-slide-down 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative;
-    z-index: 10;
+    flex-direction: column;
+    gap: 12px;
+    animation: ambient-pop-up 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 999;
   }
 
-  @keyframes ambient-slide-down {
+  :global([data-theme="dark"]) .ambient-push-card {
+    background: linear-gradient(160deg, rgba(239, 68, 68, 0.16) 0%, rgba(20, 10, 15, 0.95) 60%);
+    border: 1.5px solid rgba(239, 68, 68, 0.55);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(239, 68, 68, 0.25);
+  }
+
+  @keyframes ambient-pop-up {
     from {
       opacity: 0;
-      transform: translateY(-12px) scale(0.98);
+      transform: translateY(16px) scale(0.96);
     }
     to {
       opacity: 1;
@@ -361,102 +395,109 @@
     }
   }
 
-  .ambient-push-content {
+  .ambient-push-header {
     display: flex;
     align-items: center;
-    gap: var(--sp-12);
-    min-width: 0;
+    justify-content: space-between;
+    gap: 8px;
   }
 
   .ambient-push-badge {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: rgba(245, 158, 11, 0.25);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.5);
+    background: rgba(239, 68, 68, 0.16);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.35);
     padding: 3px 8px;
     border-radius: 999px;
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    white-space: nowrap;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-  }
-
-  .ambient-push-message {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .ambient-push-title {
-    font-size: var(--fs-small);
-    color: var(--text-base);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ambient-push-sub {
-    font-size: 12px;
-    color: var(--text-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .ambient-push-actions {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-8);
-    flex-shrink: 0;
-  }
-
-  .ambient-action-btn {
-    background: #f59e0b;
-    color: #0f172a;
-    font-size: 12px;
-    font-weight: 700;
-    padding: 6px 14px;
-    border-radius: 999px;
-    border: none;
-    cursor: pointer;
-    transition: transform 0.15s ease, filter 0.15s ease;
-  }
-  .ambient-action-btn:hover {
-    filter: brightness(1.1);
-    transform: translateY(-1px);
   }
 
   .ambient-dismiss-btn {
     background: transparent;
     color: var(--text-muted);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    width: 26px;
-    height: 26px;
+    border: 1px solid var(--line-soft, rgba(0, 0, 0, 0.08));
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
-    transition: background-color 0.15s ease, color 0.15s ease;
+    font-size: 11px;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   }
   .ambient-dismiss-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--text-base);
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
+  }
+
+  .ambient-push-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .ambient-push-title {
+    font-size: 14.5px;
+    font-weight: 600;
+    color: var(--text, #111827);
+    line-height: 1.35;
+  }
+
+  .ambient-push-desc {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-muted, #64748b);
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ambient-push-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+
+  .ambient-action-btn {
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: 999px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+    transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ambient-action-btn:hover {
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(239, 68, 68, 0.45);
+  }
+  .ambient-action-btn:active {
+    transform: translateY(0);
   }
 
   @media (max-width: 720px) {
-    .ambient-push-banner {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: var(--sp-10);
-    }
-    .ambient-push-actions {
-      align-self: flex-end;
+    .ambient-push-card {
+      right: 16px;
+      bottom: 16px;
+      width: calc(100% - 32px);
+      max-width: 340px;
     }
     .main-content {
       padding: var(--sp-12) var(--sp-12) 0 var(--sp-12);

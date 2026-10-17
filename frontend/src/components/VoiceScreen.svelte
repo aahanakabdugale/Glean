@@ -480,10 +480,10 @@
     background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.25px);
   }
 
-  /* Concentric Sonar Rings - Full complete 360-degree circles extending into/behind the top bar */
+  /* Concentric Sonar Rings - perfectly centered on the 140px hero orb center (padding 24px + margin-top 12px + half-orb 70px = 106px) */
   .sonar-container {
     position: absolute;
-    top: 110px;
+    top: 106px;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 0;
@@ -665,7 +665,7 @@
     gap: var(--sp-16);
     max-width: 560px;
     width: 100%;
-    margin-top: 8px;
+    margin-top: 12px;
     transition: max-width 400ms var(--ease), gap 400ms var(--ease);
   }
 

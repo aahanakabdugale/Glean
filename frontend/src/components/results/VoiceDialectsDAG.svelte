@@ -1,6 +1,7 @@
 <script>
   import CenterSheet from './CenterSheet.svelte';
   import { cleanTextForSpeech } from '../../lib/speech.js';
+  import { alexaMicEnabled } from '../../lib/store.js';
 
   export let data = {
     schemeName: 'Senior Citizens Savings Scheme [scss]',
@@ -105,6 +106,7 @@
   }
 
   function handlePlayAudio() {
+    if (!$alexaMicEnabled) return;
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(cleanTextForSpeech(currentCfg.speech));
