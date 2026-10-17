@@ -186,3 +186,16 @@ export function toggleTracePanel() {
   showTracePanel.update(v => !v);
 }
 
+// ---------- PROACTIVE AMBIENT PUSH ALERTS (SSE) -------------
+export const activeAmbientAlert = writable(null);
+export const ambientAlertHistory = writable([]);
+
+export function dismissAmbientAlert() {
+  activeAmbientAlert.set(null);
+}
+
+export function pushAmbientAlert(alert) {
+  activeAmbientAlert.set(alert);
+  ambientAlertHistory.update(list => [alert, ...list].slice(0, 20));
+}
+

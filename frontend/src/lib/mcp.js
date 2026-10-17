@@ -9,6 +9,16 @@
 
 import { get } from 'svelte/store';
 import { settings, connectionStatus, addToolTrace } from './store.js';
+import {
+  generateDashboardSpokenBrief,
+  generateFamilyBriefSpokenBrief,
+  generateExpiringDocsSpokenBrief,
+  generateTasksSpokenBrief,
+  generateEligibilitySpokenBrief,
+  generateChecklistSpokenBrief,
+  generatePlanSpokenBrief,
+  generateMembersSpokenBrief
+} from './speech.js';
 
 // ---------- Low-level transport ---------------------------
 
@@ -164,70 +174,162 @@ export async function callFamilyBrief(memberName = '') {
   const args = memberName && memberName !== 'all' ? { member_name: memberName } : {};
   const raw = await callTool('family_brief', args);
   if (raw.ok) {
-    return { ...raw, resultType: 'family_brief', resultData: parseFamilyBrief(raw.text) };
+    const parsed = parseFamilyBrief(raw.text);
+    return {
+      ...raw,
+      resultType: 'family_brief',
+      resultData: parsed,
+      spokenText: generateFamilyBriefSpokenBrief(parsed, memberName)
+    };
   }
   const demo = demoFamilyBrief(memberName);
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'family_brief', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'family_brief',
+    resultData: demo.data,
+    spokenText: generateFamilyBriefSpokenBrief(demo.data, memberName)
+  };
 }
 
 export async function callGetExpiringDocuments(days = 30) {
   const raw = await callTool('get_expiring_documents', { days });
   if (raw.ok) {
-    return { ...raw, resultType: 'expiring_docs', resultData: parseExpiringDocs(raw.text) };
+    const parsed = parseExpiringDocs(raw.text);
+    return {
+      ...raw,
+      resultType: 'expiring_docs',
+      resultData: parsed,
+      spokenText: generateExpiringDocsSpokenBrief(parsed, days)
+    };
   }
   const demo = demoExpiringDocs();
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'expiring_docs', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'expiring_docs',
+    resultData: demo.data,
+    spokenText: generateExpiringDocsSpokenBrief(demo.data, days)
+  };
 }
 
 export async function callListUpcomingTasks(days = 30) {
   const raw = await callTool('list_upcoming_tasks', { days });
   if (raw.ok) {
-    return { ...raw, resultType: 'upcoming_tasks', resultData: parseUpcomingTasks(raw.text) };
+    const parsed = parseUpcomingTasks(raw.text);
+    return {
+      ...raw,
+      resultType: 'upcoming_tasks',
+      resultData: parsed,
+      spokenText: generateTasksSpokenBrief(parsed, days)
+    };
   }
   const demo = demoUpcomingTasks();
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'upcoming_tasks', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'upcoming_tasks',
+    resultData: demo.data,
+    spokenText: generateTasksSpokenBrief(demo.data, days)
+  };
 }
 
 export async function callCheckSchemeEligibility(name, tags = '') {
   const raw = await callTool('check_scheme_eligibility', { name, tags });
   if (raw.ok) {
-    return { ...raw, resultType: 'scheme_eligibility', resultData: parseEligibility(raw.text, name) };
+    const parsed = parseEligibility(raw.text, name);
+    return {
+      ...raw,
+      resultType: 'scheme_eligibility',
+      resultData: parsed,
+      spokenText: generateEligibilitySpokenBrief(parsed, name)
+    };
   }
   const demo = demoEligibility(name);
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'scheme_eligibility', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'scheme_eligibility',
+    resultData: demo.data,
+    spokenText: generateEligibilitySpokenBrief(demo.data, name)
+  };
 }
 
 export async function callGetSchemeChecklist(scheme) {
   const raw = await callTool('get_scheme_checklist', { scheme });
   if (raw.ok) {
-    return { ...raw, resultType: 'scheme_checklist', resultData: parseChecklist(raw.text) };
+    const parsed = parseChecklist(raw.text);
+    return {
+      ...raw,
+      resultType: 'scheme_checklist',
+      resultData: parsed,
+      spokenText: generateChecklistSpokenBrief(parsed)
+    };
   }
   const demo = demoChecklist(scheme);
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'scheme_checklist', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'scheme_checklist',
+    resultData: demo.data,
+    spokenText: generateChecklistSpokenBrief(demo.data)
+  };
 }
 
 export async function callPlanSchemeApplication(name, scheme, days_to_prepare = 7) {
   const raw = await callTool('plan_scheme_application', { name, scheme, days_to_prepare });
   if (raw.ok) {
-    return { ...raw, resultType: 'plan_application', resultData: parsePlan(raw.text) };
+    const parsed = parsePlan(raw.text);
+    return {
+      ...raw,
+      resultType: 'plan_application',
+      resultData: parsed,
+      spokenText: generatePlanSpokenBrief(parsed, name, scheme)
+    };
   }
   const demo = demoPlan(name, scheme);
-  return { ok: true, text: demo.text, isLive: false, ms: 0,
-           resultType: 'plan_application', resultData: demo.data };
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'plan_application',
+    resultData: demo.data,
+    spokenText: generatePlanSpokenBrief(demo.data, name, scheme)
+  };
 }
 
 export async function callListFamilyMembers() {
   const raw = await callTool('list_family_members');
   if (raw.ok) {
-    return { ...raw, resultType: 'family_members', resultData: parseFamilyMembers(raw.text) };
+    const parsed = parseFamilyMembers(raw.text);
+    return {
+      ...raw,
+      resultType: 'family_members',
+      resultData: parsed,
+      spokenText: generateMembersSpokenBrief(parsed)
+    };
   }
-  return { ok: true, text: demoMembersText(), isLive: false, ms: 0,
-           resultType: 'family_members', resultData: demoMembersData() };
+  const demoData = demoMembersData();
+  return {
+    ok: true,
+    text: demoMembersText(),
+    isLive: false,
+    ms: 0,
+    resultType: 'family_members',
+    resultData: demoData,
+    spokenText: generateMembersSpokenBrief(demoData)
+  };
 }
 
 export async function callAddFamilyMember(name, relation, birth_year, status) {
@@ -242,18 +344,92 @@ export async function callAddTask(title, due_date, owner = '') {
   return callTool('add_task', { title, due_date, owner });
 }
 
+export async function callOrchestrateLifeEvent(memberName, eventType, notes = '') {
+  const raw = await callTool('orchestrate_life_event', { member_name: memberName, event_type: eventType, notes });
+  if (raw.ok) {
+    const parsed = parseLifeEvent(raw.text);
+    if (memberName) parsed.memberName = memberName;
+    return { ...raw, resultType: 'life_event', resultData: parsed, spokenText: parsed.spokenBrief || raw.text };
+  }
+  const demo = demoLifeEvent(memberName, eventType);
+  return { ok: true, text: demo.text, isLive: false, ms: 0, resultType: 'life_event', resultData: demo.data, spokenText: demo.data.spokenBrief };
+}
+
+export async function callAuditDocumentDependencies(memberName = '') {
+  const raw = await callTool('audit_document_dependencies', { member_name: memberName });
+  if (raw.ok) {
+    const parsed = parseAuditDependencies(raw.text);
+    if (memberName) parsed.memberName = memberName;
+    return { ...raw, resultType: 'dependency_audit', resultData: parsed, spokenText: parsed.spokenBrief || raw.text };
+  }
+  const demo = demoAuditDependencies(memberName);
+  return { ok: true, text: demo.text, isLive: false, ms: 0, resultType: 'dependency_audit', resultData: demo.data, spokenText: demo.data.spokenBrief };
+}
+
+export async function callSimulateBureaucraticConflicts(memberName = '', targetSchemes = '') {
+  const raw = await callTool('simulate_bureaucratic_conflicts', { member_name: memberName, target_schemes: targetSchemes });
+  if (raw.ok) {
+    const parsed = parseBureaucraticConflicts(raw.text);
+    if (memberName) parsed.memberName = memberName;
+    return { ...raw, resultType: 'bureaucratic_conflicts', resultData: parsed, spokenText: parsed.spokenBrief || raw.text };
+  }
+  const demo = demoBureaucraticConflicts(memberName);
+  return { ok: true, text: demo.text, isLive: false, ms: 0, resultType: 'bureaucratic_conflicts', resultData: demo.data, spokenText: demo.data.spokenBrief };
+}
+
+export async function callTriggerProactiveAmbientAlert(memberName = '', customMessage = '') {
+  return callTool('trigger_proactive_ambient_alert', { member_name: memberName, custom_message: customMessage });
+}
+
+export async function callExplainForGeneration(schemeId = 'scss', targetPersona = 'grandparent') {
+  const raw = await callTool('explain_for_generation', { scheme_id: schemeId, target_persona: targetPersona });
+  if (raw.ok) {
+    const parsed = parseExplainGeneration(raw.text);
+    return { ...raw, resultType: 'explain_generation', resultData: parsed, spokenText: parsed.spokenBrief || raw.text };
+  }
+  const demo = demoExplainGeneration(schemeId, targetPersona);
+  return { ok: true, text: demo.text, isLive: false, ms: 0, resultType: 'explain_generation', resultData: demo.data, spokenText: demo.data.spokenBrief };
+}
+
+export function initAmbientSSE(onAlert) {
+  if (typeof window === 'undefined' || !window.EventSource) return null;
+  try {
+    const es = new EventSource('/api/ambient/events');
+    es.addEventListener('ambient_alert', (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (onAlert) onAlert(data);
+      } catch (err) {
+        console.error('Failed to parse ambient alert SSE', err);
+      }
+    });
+    return es;
+  } catch (err) {
+    console.warn('Ambient SSE connection failed:', err);
+    return null;
+  }
+}
+
 export async function callGetFamilyDashboard() {
   const raw = await callTool('get_family_dashboard');
   if (raw.ok) {
-    return { ...raw, resultType: 'family_dashboard', resultData: parseDashboard(raw.text) };
+    const parsed = parseDashboard(raw.text);
+    return {
+      ...raw,
+      resultType: 'family_dashboard',
+      resultData: parsed,
+      spokenText: generateDashboardSpokenBrief(parsed)
+    };
   }
+  const demoData = demoDashboardData();
   return {
     ok: true,
     text: demoDashboardText(),
     isLive: false,
     ms: 0,
     resultType: 'family_dashboard',
-    resultData: demoDashboardData(),
+    resultData: demoData,
+    spokenText: generateDashboardSpokenBrief(demoData),
   };
 }
 
@@ -583,4 +759,538 @@ function demoDashboardData() {
 function demoDashboardText() {
   return `=== FAMILY ADMIN DASHBOARD (6 Members Tracked) ===\n• Documents: 18 tracked (3 expiring in 60d, 1 urgent)\n• Tasks: 4 pending (3 due in 30d, 0 overdue)\n• Scheme Opportunities: 4 matches identified\n\n--- FAMILY ROSTER ---\n• Chandler (grandfather) — Born 1950, retired\n• Amy (grandmother) — Born 1953, retired\n• Justin (father) — Born 1968, employed\n• Riley (mother) — Born 1972, employed\n• Jace (son) — Born 2000, family admin\n• Gwen (daughter) — Born 2003, family admin\n\n--- EXPIRING DOCUMENTS ---\n• Chandler's Passport — expires 2026-10-21 [URGENT (6d left)]\n• Justin's Motor Vehicle Insurance — expires 2026-10-27 [12d left]\n• Gwen's University Transit Pass — expires 2026-10-30 [15d left]\n\n--- UPCOMING DEADLINES ---\n• Renew Chandler's passport appointment (Chandler) — due 2026-10-19 [4d left]\n• Check Ayushman & senior benefits (Chandler) — due 2026-10-25 [10d left]\n\n--- BENEFIT OPPORTUNITIES ---\n• Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n• Amy qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n\nNote: Guidance only. Verified on official portals.`;
 }
+
+// ---------- Parsers for Interactive Pipeline DAGs ----------
+
+function parseAuditDependencies(text) {
+  let totalAudited = 6, criticalBlockers = 0, impendingRisks = 1;
+  const auditMatch = text.match(/Audited:\s*(\d+)\s*Member\(s\)\s*\|\s*🚨\s*(\d+)\s*Critical Blocker\(s\)\s*\|\s*⚠️\s*(\d+)\s*Impending Risk\(s\)/i);
+  if (auditMatch) {
+    totalAudited = parseInt(auditMatch[1], 10);
+    criticalBlockers = parseInt(auditMatch[2], 10);
+    impendingRisks = parseInt(auditMatch[3], 10);
+  }
+
+  const members = [];
+  const memberBlocks = text.split(/(?=[🚨⚠️✅]\s*\*\*[^*]+\*\*)/g);
+
+  for (const block of memberBlocks) {
+    const headerMatch = block.match(/^([🚨⚠️✅])\s*\*\*([^*]+)\*\*\s*\(([^,]+),\s*born\s*(\d{4})\):/);
+    if (!headerMatch) continue;
+
+    const [, icon, name, relation, birthYear] = headerMatch;
+    const blockers = [];
+    const risks = [];
+    const ready = [];
+
+    for (const line of block.split('\n')) {
+      const bMatch = line.match(/BLOCKER:\s*(.+?)\s*expired\s*(\d+)d\s*ago\s*\(([^)]+)\)\s*(?:➔|->)\s*blocks\s*(.+)/i);
+      if (bMatch) {
+        blockers.push({ doc: bMatch[1].trim(), daysAgo: parseInt(bMatch[2], 10), expiry: bMatch[3].trim(), blockedScheme: bMatch[4].trim() });
+      }
+
+      const rMatch = line.match(/RISK:\s*(.+?)\s*expires\s*in\s*(\d+)d\s*\(([^)]+)\)\s*(?:➔|->)\s*jeopardizes\s*(.+)/i);
+      if (rMatch) {
+        risks.push({ doc: rMatch[1].trim(), daysLeft: parseInt(rMatch[2], 10), expiry: rMatch[3].trim(), atRiskScheme: rMatch[4].trim() });
+      }
+
+      const readyMatch = line.match(/READY:\s*All prerequisite docs valid for\s*(.+)/i);
+      if (readyMatch) {
+        ready.push(readyMatch[1].trim());
+      }
+    }
+
+    let status = 'ok';
+    if (blockers.length > 0 || icon === '🚨') status = 'urgent';
+    else if (risks.length > 0 || icon === '⚠️') status = 'risk';
+
+    members.push({
+      name: name.trim(),
+      relation: relation.trim(),
+      birthYear: parseInt(birthYear, 10),
+      status,
+      blockers,
+      risks,
+      ready,
+    });
+  }
+
+  // Critical path steps
+  const criticalPath = [];
+  const pathMatches = text.matchAll(/•\s*Step\s*(\d+)\s*\[([^\]]+)\]:\s*(.+)/g);
+  for (const m of pathMatches) {
+    criticalPath.push({ step: parseInt(m[1], 10), level: m[2], text: m[3].trim() });
+  }
+
+  // Spoken brief extraction
+  let spokenBrief = '';
+  const spokenMatch = text.match(/--- SPOKEN BRIEF \(ALEXA READY\) ---\s*\n"([^"]+)"/);
+  if (spokenMatch) spokenBrief = spokenMatch[1];
+
+  return { totalAudited, criticalBlockers, impendingRisks, members, criticalPath, spokenBrief, raw: text };
+}
+
+function parseBureaucraticConflicts(text) {
+  let totalConflicts = 4, protectedValueInr = 1048000;
+  const countMatch = text.match(/\|\s*⚠️\s*(\d+)\s*Bureaucratic Conflict/i);
+  if (countMatch) totalConflicts = parseInt(countMatch[1], 10);
+
+  const valMatch = text.match(/Safeguarded:\s*₹([\d,]+)\s*INR/i);
+  if (valMatch) protectedValueInr = parseInt(valMatch[1].replace(/,/g, ''), 10);
+
+  const conflicts = [];
+  const conflictBlocks = text.split(/\n(?=\d+\.\s*\[)/);
+
+  for (const block of conflictBlocks) {
+    const headMatch = block.match(/^\d+\.\s*\[([^\]]+)\]\s*(.+)/);
+    if (!headMatch) continue;
+
+    const severity = headMatch[1].trim();
+    const type = headMatch[2].trim();
+    const affected = block.match(/•\s*Affected:\s*(.+)/)?.[1]?.trim() || '';
+    const schemes = block.match(/•\s*Conflicting Programs:\s*(.+)/)?.[1]?.trim() || '';
+    const clause = block.match(/•\s*Governing Rule:\s*(.+)/)?.[1]?.trim() || '';
+    const risk = block.match(/•\s*Scrutiny Risk:\s*(.+)/)?.[1]?.trim() || '';
+
+    conflicts.push({ severity, type, parties: affected, schemes, clause, risk });
+  }
+
+  const restructuringSteps = [];
+  const stepsMatch = text.matchAll(/•\s*Step\s*\d+:\s*(.+)/g);
+  for (const m of stepsMatch) {
+    restructuringSteps.push(m[1].trim());
+  }
+
+  let spokenBrief = '';
+  const spokenMatch = text.match(/--- SPOKEN BRIEF \(ALEXA READY\) ---\s*\n"([^"]+)"/);
+  if (spokenMatch) spokenBrief = spokenMatch[1];
+
+  return { totalConflicts, protectedValueInr, conflicts, restructuringSteps, spokenBrief, raw: text };
+}
+
+function parseExplainGeneration(text) {
+  const schemeName = text.match(/Scheme:\s*(.+)/)?.[1]?.trim() || 'Senior Citizens Savings Scheme [scss]';
+  const targetPersona = text.match(/Target Persona:\s*(.+)/)?.[1]?.trim() || 'Grandparent (Senior Citizen)';
+  const toneLabel = text.match(/Cognitive Mode:\s*(.+)/)?.[1]?.trim() || 'Warm & Reassuring (Zero Bureaucracy)';
+  
+  let speech = '';
+  const speechMatch = text.match(/--- ALEXA SPOKEN EXPLANATION ---\s*\n"([^"]+)"/);
+  if (speechMatch) speech = speechMatch[1];
+
+  let analogy = '';
+  const analogyMatch = text.match(/--- GENERATIONAL ANALOGY ---\s*\n💡\s*(.+)/);
+  if (analogyMatch) analogy = analogyMatch[1];
+
+  const readability = text.match(/•\s*Readability:\s*(.+)/)?.[1]?.trim() || 'Grade 4 (Gentle Conversational)';
+  const jargonIndex = text.match(/•\s*Bureaucracy Jargon Index:\s*(.+)/)?.[1]?.trim() || '0%';
+  const score = parseInt(text.match(/•\s*Empathetic Alignment Score:\s*(\d+)/)?.[1] || '98', 10);
+
+  let personaKey = 'grandparent';
+  const low = targetPersona.toLowerCase();
+  if (low.includes('student') || low.includes('young')) personaKey = 'young_adult';
+  else if (low.includes('parent') || low.includes('working')) personaKey = 'parent';
+
+  return {
+    schemeName,
+    personaKey,
+    personaLabel: targetPersona,
+    toneLabel,
+    speech,
+    analogy,
+    readability,
+    jargonIndex,
+    score,
+    spokenBrief: speech,
+    raw: text
+  };
+}
+
+function parseLifeEvent(text) {
+  const title = text.match(/Life-Event Roadmap Orchestrated:\s*(.+)/)?.[1]?.trim() || 'Retirement & Senior Transition for Justin';
+  const memberLine = text.match(/•\s*Member:\s*([^(]+)\s*\(([^)]+)\)\s*\|\s*Born\s*(\d{4})[^|]*\|\s*Status:\s*(.+)/);
+  
+  const memberName = memberLine ? memberLine[1].trim() : 'Justin';
+  const relation = memberLine ? memberLine[2].trim() : 'father';
+  const birthYear = memberLine ? parseInt(memberLine[3], 10) : 1968;
+  const statusTransition = memberLine ? memberLine[4].trim() : 'Employed ➔ Retired Senior';
+
+  const unlockedSchemes = [];
+  const schemeMatches = text.matchAll(/•\s*\[([^\]]+)\]\s*([^—\n]+)(?:—\s*(.+))?/g);
+  for (const sm of schemeMatches) {
+    unlockedSchemes.push({ status: sm[1].trim(), name: sm[2].trim(), detail: sm[3] ? sm[3].trim() : '' });
+  }
+
+  const vaultDocs = [];
+  const vaultMatch = text.match(/•\s*In Vault:\s*(.+)/);
+  if (vaultMatch && !vaultMatch[1].includes('None')) {
+    vaultDocs.push(...vaultMatch[1].split(',').map(s => s.trim()));
+  }
+
+  const missingDocs = [];
+  const missingMatch = text.match(/•\s*Action Required \(Missing\):\s*(.+)/);
+  if (missingMatch) {
+    missingDocs.push(...missingMatch[1].split(',').map(s => s.trim()));
+  }
+
+  const phases = [];
+  const phaseMatches = text.matchAll(/•\s*Day\s*\+(\d+)\s*\(([^)]+)\):\s*(.+)/g);
+  for (const pm of phaseMatches) {
+    phases.push({ dayOffset: parseInt(pm[1], 10), dueDate: pm[2].trim(), task: pm[3].trim() });
+  }
+
+  return {
+    title,
+    memberName,
+    relation,
+    birthYear,
+    statusTransition,
+    unlockedSchemes,
+    vaultDocs,
+    missingDocs,
+    phases,
+    spokenBrief: `I've prepared a phased retirement roadmap for ${memberName} with ${phases.length} scheduled milestone tasks.`,
+    raw: text
+  };
+}
+
+// Fallback demo fixtures for offline mode
+function demoAuditDependencies(memberName = '') {
+  const norm = (memberName || '').trim().toLowerCase();
+
+  if (norm === 'jace') {
+    const data = {
+      totalAudited: 1,
+      criticalBlockers: 0,
+      impendingRisks: 0,
+      members: [
+        { name: 'Jace', relation: 'son', birthYear: 2000, status: 'ok', blockers: [], risks: [], ready: ['Digital Vault Verified'] }
+      ],
+      criticalPath: [
+        { step: 1, level: 'READY', text: "All documents for Jace (Passport, Driving Licence, Term Insurance) are healthy and fully compliant with target schemes." }
+      ],
+      spokenBrief: "All documents for Jace are healthy and fully compliant with 0 blockers."
+    };
+    return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 1 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 0 Impending Risk(s)\n\n✅ **Jace** (son, born 2000):\n   • No active scheme dependency blockers.\n\n• All documents are healthy and fully compliant with target schemes.", data };
+  }
+
+  if (norm === 'amy') {
+    const data = {
+      totalAudited: 1,
+      criticalBlockers: 0,
+      impendingRisks: 1,
+      members: [
+        {
+          name: 'Amy', relation: 'grandmother', birthYear: 1953, status: 'risk', blockers: [],
+          risks: [{ doc: 'Pension Life Verification Certificate', daysLeft: 18, expiry: '2026-11-04', atRiskScheme: 'Pension Disbursement & Senior Concessions' }],
+          ready: ['Ayushman Vay Vandana Card (AB PM-JAY)']
+        }
+      ],
+      criticalPath: [
+        { step: 1, level: 'HIGH', text: "Schedule renewal for Amy's Pension Life Verification Certificate (18d left). Prevents bottleneck in Pension Disbursement." }
+      ],
+      spokenBrief: "Heads up: Amy's Pension Life Verification Certificate expires in 18 days. Submit life verification soon."
+    };
+    return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 1 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 1 Impending Risk(s)\n\n⚠️ **Amy** (grandmother, born 1953):\n   • ⚠️ RISK: Pension Life Verification Certificate expires in 18d ➔ jeopardizes Pension Disbursement", data };
+  }
+
+  if (norm === 'justin') {
+    const data = {
+      totalAudited: 1,
+      criticalBlockers: 0,
+      impendingRisks: 1,
+      members: [
+        {
+          name: 'Justin', relation: 'father', birthYear: 1968, status: 'risk', blockers: [],
+          risks: [{ doc: 'Motor Vehicle Comprehensive Insurance', daysLeft: 12, expiry: '2026-10-29', atRiskScheme: 'Vehicle Registration & Active Cover' }],
+          ready: ['Senior Citizens Savings Scheme']
+        }
+      ],
+      criticalPath: [
+        { step: 1, level: 'HIGH', text: "Schedule renewal for Justin's Motor Vehicle Comprehensive Insurance (12d left). Maintains active road compliance." }
+      ],
+      spokenBrief: "Heads up: Justin's Motor Vehicle Comprehensive Insurance expires in 12 days."
+    };
+    return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 1 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 1 Impending Risk(s)\n\n⚠️ **Justin** (father, born 1968):\n   • ⚠️ RISK: Motor Vehicle Comprehensive Insurance expires in 12d ➔ jeopardizes Active Cover", data };
+  }
+
+  if (norm === 'riley') {
+    const data = {
+      totalAudited: 1,
+      criticalBlockers: 0,
+      impendingRisks: 1,
+      members: [
+        {
+          name: 'Riley', relation: 'mother', birthYear: 1972, status: 'risk', blockers: [],
+          risks: [{ doc: 'Health Insurance Policy', daysLeft: 28, expiry: '2026-11-14', atRiskScheme: 'Family Cashless Health Cover' }],
+          ready: []
+        }
+      ],
+      criticalPath: [
+        { step: 1, level: 'HIGH', text: "Schedule renewal for Riley's Health Insurance Policy (28d left). Protects family cashless hospital cover." }
+      ],
+      spokenBrief: "Heads up: Riley's Health Insurance Policy expires in 28 days."
+    };
+    return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 1 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 1 Impending Risk(s)\n\n⚠️ **Riley** (mother, born 1972):\n   • ⚠️ RISK: Health Insurance Policy expires in 28d ➔ jeopardizes Cashless Cover", data };
+  }
+
+  if (norm === 'gwen') {
+    const data = {
+      totalAudited: 1,
+      criticalBlockers: 0,
+      impendingRisks: 1,
+      members: [
+        {
+          name: 'Gwen', relation: 'daughter', birthYear: 2003, status: 'risk', blockers: [],
+          risks: [{ doc: 'University Transit Pass', daysLeft: 15, expiry: '2026-11-01', atRiskScheme: 'Student Transit Concession Pass' }],
+          ready: ['DigiLocker Student Vault']
+        }
+      ],
+      criticalPath: [
+        { step: 1, level: 'HIGH', text: "Schedule renewal for Gwen's University Transit Pass (15d left). Prevents disruption in student concession fares." }
+      ],
+      spokenBrief: "Heads up: Gwen's University Transit Pass expires in 15 days."
+    };
+    return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 1 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 1 Impending Risk(s)\n\n⚠️ **Gwen** (daughter, born 2003):\n   • ⚠️ RISK: University Transit Pass expires in 15d ➔ jeopardizes Student Concession Pass", data };
+  }
+
+  // Chandler (default)
+  const data = {
+    totalAudited: 6,
+    criticalBlockers: 0,
+    impendingRisks: 1,
+    members: [
+      { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'risk', blockers: [], risks: [{ doc: 'Passport', daysLeft: 6, expiry: '2026-10-23', atRiskScheme: 'Ayushman Vay Vandana Card (AB PM-JAY)' }, { doc: 'Passport', daysLeft: 6, expiry: '2026-10-23', atRiskScheme: 'Senior Citizens Savings Scheme' }], ready: [] },
+      { name: 'Amy', relation: 'grandmother', birthYear: 1953, status: 'ok', blockers: [], risks: [], ready: [] },
+      { name: 'Justin', relation: 'father', birthYear: 1968, status: 'ok', blockers: [], risks: [], ready: ['Senior Citizens Savings Scheme'] },
+      { name: 'Riley', relation: 'mother', birthYear: 1972, status: 'ok', blockers: [], risks: [], ready: [] },
+      { name: 'Jace', relation: 'son', birthYear: 2000, status: 'ok', blockers: [], risks: [], ready: [] },
+      { name: 'Gwen', relation: 'daughter', birthYear: 2003, status: 'ok', blockers: [], risks: [], ready: [] },
+    ],
+    criticalPath: [
+      { step: 1, level: 'HIGH', text: "Schedule renewal for Chandler's Passport (6d left). Prevents bottleneck in Senior Citizens Savings Scheme and Ayushman Vay Vandana Card." }
+    ],
+    spokenBrief: "Heads up: Chandler's Passport expires in 6 days. Renewing it soon will protect your Ayushman Vay Vandana Card application."
+  };
+  return { text: "=== DOCUMENT DEPENDENCY & BOTTLENECK AUDIT ===\nAudited: 6 Member(s) | 🚨 0 Critical Blocker(s) | ⚠️ 1 Impending Risk(s)", data };
+}
+
+function demoBureaucraticConflicts(memberName = '') {
+  const norm = (memberName || '').trim().toLowerCase();
+
+  if (norm === 'jace' || norm === 'gwen' || norm === 'justin' || norm === 'riley') {
+    const capName = norm.charAt(0).toUpperCase() + norm.slice(1);
+    const data = {
+      totalConflicts: 0,
+      protectedValueInr: 0,
+      conflicts: [],
+      restructuringSteps: [
+        `Maintain current application profile for ${capName}. Zero mutual exclusivity violations or statutory tax disqualifiers detected.`
+      ],
+      spokenBrief: `Great news: ${capName}'s profile has zero bureaucratic conflicts or quota violations. Everything is clear to submit.`
+    };
+    return { text: `=== BUREAUCRATIC CONFLICT & RED-TAPE SIMULATION ===\nStatus: ✅ CLEAN SCRUTINY PATH (0 CONFLICTS)\nAudited: 1 Family Member(s) | ⚠️ 0 Bureaucratic Conflict(s) Identified\nEstimated Financial Entitlement Safeguarded: ₹0 INR\n\n• No mutual exclusivity violations, statutory tax disqualifiers, or household quota breaches detected.`, data };
+  }
+
+  const activeName = norm === 'chandler' ? 'Chandler' : 'Amy';
+  const ageStr = norm === 'chandler' ? 'Age 76' : 'Age 73';
+  const data = {
+    totalConflicts: 2,
+    protectedValueInr: 1048000,
+    conflicts: [
+      {
+        severity: 'CRITICAL EXCLUSION',
+        type: 'Dual Statutory Health Cover Collision',
+        parties: `${activeName} (${ageStr})`,
+        schemes: 'Ayushman Vay Vandana Card (AB PM-JAY) vs. CGHS / ECHS Pensioner Cover',
+        clause: 'AB PM-JAY Guidelines Clause 4.2: Senior citizens covered under existing Central/State Govt health schemes cannot receive dual benefits without an explicit option declaration.',
+        risk: 'Application rejected at portal scrutiny or cancellation of existing outpatient medicine coverage.'
+      }
+    ],
+    restructuringSteps: [
+      `Submit Ayushman Form-B Option Declaration for ${activeName} to designate Ayushman Vay Vandana for in-patient cashless hospitalisation while preserving CGHS outpatient dispensary access.`
+    ],
+    spokenBrief: `Alert: Found bureaucratic conflicts for ${activeName} under dual statutory health cover. I've prepared a restructuring strategy to safeguard ₹1,048,000 in entitlements.`
+  };
+  return { text: "=== BUREAUCRATIC CONFLICT & RED-TAPE SIMULATION ===\nStatus: 🚨 CRITICAL SCRUTINY HAZARDS DETECTED", data };
+}
+
+function demoExplainGeneration(schemeId = 'scss', targetPersona = 'grandparent', memberName = '') {
+  const norm = (memberName || '').trim().toLowerCase();
+  let personaKey = targetPersona;
+  if (norm === 'jace' || norm === 'gwen') personaKey = 'young_adult';
+  else if (norm === 'riley' || norm === 'justin') personaKey = 'parent';
+  else if (norm === 'chandler' || norm === 'amy') personaKey = 'grandparent';
+
+  let schemeName = 'Senior Citizens Savings Scheme [scss]';
+  let speech = "Dadaji, this is the safest place to rest your lifetime savings. Think of it like a government piggy bank that pays you a handsome reward every three months directly into your bank account. The government guarantees your money will never drop, giving you steady quarterly pocket money to spend freely without depending on anyone.";
+  let analogy = 'A golden post office piggy-bank that gives you tea and fruit money every three months.';
+  let readability = 'Grade 4 (Gentle Conversational)';
+  let jargonIndex = '0%';
+
+  if (personaKey === 'young_adult') {
+    schemeName = 'Sovereign High-Yield Savings & SGBs';
+    speech = "Hey! Think of this as an ultra-safe 8.2% fixed-yield instrument backed by the sovereign treasury. If you help your grandparents set this up via NetBanking or Post Office digital portal, it locks in peak quarterly payouts with zero market drawdowns. It's essentially risk-free alpha.";
+    analogy = 'A sovereign high-yield savings engine that gives guaranteed quarterly alpha without equity drawdowns.';
+    readability = 'Grade 8 (Structured & Analytical)';
+    jargonIndex = '5%';
+  } else if (personaKey === 'parent') {
+    schemeName = 'SCSS & Pension Transition';
+    speech = "For elderly parent portfolio planning, SCSS offers an 8.2% sovereign-backed yield with Section 80C tax deductions up to ₹1.5 Lakhs annually. Deposit cap is ₹30 Lakhs per individual senior, delivering predictable quarterly cash flow to insulate the family budget from market volatility.";
+    analogy = 'A tax-deductible sovereign risk hedge providing fixed quarterly cash flow.';
+    readability = 'Grade 10 (Executive & Financial)';
+    jargonIndex = '15%';
+  }
+
+  const data = {
+    schemeName,
+    personaKey,
+    personaLabel: personaKey === 'young_adult' ? 'Young Adult (Student)' : (personaKey === 'parent' ? 'Parent (Working Adult)' : 'Grandparent (Senior Citizen)'),
+    toneLabel: 'Warm & Reassuring (Zero Bureaucracy)',
+    speech,
+    analogy,
+    readability,
+    jargonIndex,
+    score: 98,
+    spokenBrief: speech.slice(0, 160) + '…'
+  };
+  return { text: "=== CROSS-GENERATIONAL VOICE DIALECT ENGINE ===", data };
+}
+
+function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
+  const norm = (memberName || 'Justin').trim().toLowerCase();
+
+  if (norm === 'jace') {
+    const data = {
+      title: 'Adulthood & Independence (Age 18+) for Jace',
+      memberName: 'Jace',
+      relation: 'son',
+      birthYear: 2000,
+      statusTransition: 'Family Admin ➔ Young Adult',
+      unlockedSchemes: [
+        { status: 'ELIGIBLE NOW', name: 'Atal Pension Yojana', detail: 'Jace qualifies for sovereign pension wealth accumulation at age 26.' }
+      ],
+      vaultDocs: ['Passport', 'Driving Licence', 'Term Life Insurance Policy'],
+      missingDocs: [],
+      phases: [
+        { dayOffset: 7, dueDate: '2026-10-24', task: 'Set up EPF & UAN employer portal sync for Jace' },
+        { dayOffset: 21, dueDate: '2026-11-07', task: 'Review independent term life insurance coverage for Jace' },
+        { dayOffset: 45, dueDate: '2026-12-01', task: 'Select tax regime and allocate sovereign gold savings for Jace' }
+      ],
+      spokenBrief: "I've prepared an adulthood independence roadmap for Jace with 3 scheduled milestone tasks."
+    };
+    return { text: '🎯 Life-Event Roadmap Orchestrated: Adulthood & Independence for Jace', data };
+  }
+
+  if (norm === 'gwen') {
+    const data = {
+      title: 'University Graduation & Student Transition for Gwen',
+      memberName: 'Gwen',
+      relation: 'daughter',
+      birthYear: 2003,
+      statusTransition: 'Family Admin ➔ Young Adult',
+      unlockedSchemes: [
+        { status: 'ELIGIBLE NOW', name: 'Central Sector Interest Subsidy (CSIS)', detail: 'Full interest subsidy on education loans during university study.' }
+      ],
+      vaultDocs: ['Passport', 'Student Health Insurance'],
+      missingDocs: [],
+      phases: [
+        { dayOffset: 7, dueDate: '2026-10-24', task: 'Submit semester enrollment receipt to renew University Transit Pass for Gwen' },
+        { dayOffset: 21, dueDate: '2026-11-07', task: 'Verify Aadhaar DBT bank linkage for Central Sector Interest Subsidy for Gwen' },
+        { dayOffset: 45, dueDate: '2026-12-01', task: 'Sync digital degree credentials with DigiLocker student vault for Gwen' }
+      ],
+      spokenBrief: "I've prepared a graduation roadmap for Gwen with 3 scheduled milestone tasks."
+    };
+    return { text: '🎯 Life-Event Roadmap Orchestrated: University Graduation for Gwen', data };
+  }
+
+  if (norm === 'chandler') {
+    const data = {
+      title: 'Super-Senior Healthcare & Digital Life Certificate for Chandler',
+      memberName: 'Chandler',
+      relation: 'grandfather',
+      birthYear: 1950,
+      statusTransition: 'Retired ➔ Super Senior',
+      unlockedSchemes: [
+        { status: 'ELIGIBLE NOW', name: 'Ayushman Vay Vandana Card (AB PM-JAY)', detail: '₹5 Lakh free annual in-patient cover for seniors aged 70+.' }
+      ],
+      vaultDocs: ['Passport', 'Senior Citizen Health Insurance', 'Fixed Deposit Scheme Certificate'],
+      missingDocs: [],
+      phases: [
+        { dayOffset: 7, dueDate: '2026-10-24', task: 'Set up facial biometrics on Jeevan Pramaan App for Chandler' },
+        { dayOffset: 30, dueDate: '2026-11-16', task: 'Renew Ayushman Vay Vandana Card in-patient registration for Chandler' },
+        { dayOffset: 60, dueDate: '2026-12-16', task: 'Direct pension credit verification with State Bank for Chandler' }
+      ],
+      spokenBrief: "I've prepared a super-senior roadmap for Chandler with 3 scheduled milestone tasks."
+    };
+    return { text: '🎯 Life-Event Roadmap Orchestrated: Super-Senior Healthcare for Chandler', data };
+  }
+
+  if (norm === 'amy') {
+    const data = {
+      title: 'Senior Citizen Healthcare & Wellness Transition for Amy',
+      memberName: 'Amy',
+      relation: 'grandmother',
+      birthYear: 1953,
+      statusTransition: 'Retired ➔ Senior Pensioner',
+      unlockedSchemes: [
+        { status: 'ELIGIBLE NOW', name: 'Ayushman Vay Vandana Card (AB PM-JAY)', detail: '₹5 Lakh free annual in-patient cover for seniors aged 70+.' }
+      ],
+      vaultDocs: ['Ayushman Vay Vandana Health Card', 'Post Office Senior Savings Certificate'],
+      missingDocs: [],
+      phases: [
+        { dayOffset: 7, dueDate: '2026-10-24', task: 'Submit annual pension life certificate before 18-day deadline for Amy' },
+        { dayOffset: 30, dueDate: '2026-11-16', task: 'Designate Ayushman Form-B for in-patient cover while preserving outpatient access for Amy' },
+        { dayOffset: 60, dueDate: '2026-12-16', task: 'Quarterly SCSS interest disbursement audit for Amy' },
+        { dayOffset: 90, dueDate: '2027-01-15', task: 'Annual preventative wellness review at empanelled hospital for Amy' }
+      ],
+      spokenBrief: "I've prepared a healthcare and pension transition roadmap for Amy with 4 scheduled milestone tasks."
+    };
+    return { text: '🎯 Life-Event Roadmap Orchestrated: Senior Healthcare for Amy', data };
+  }
+
+  if (norm === 'riley') {
+    const data = {
+      title: 'Household Relocation & Estate Planning for Riley',
+      memberName: 'Riley',
+      relation: 'mother',
+      birthYear: 1972,
+      statusTransition: 'Employed ➔ Family Steward',
+      unlockedSchemes: [
+        { status: 'ELIGIBLE NOW', name: 'Section 80D Family & Senior Deductions', detail: 'Up to ₹75,000 combined annual health deductions.' }
+      ],
+      vaultDocs: ['Driving Licence', 'Professional Membership Card'],
+      missingDocs: [],
+      phases: [
+        { dayOffset: 7, dueDate: '2026-10-24', task: 'Renew Family Health Insurance policy with accumulated cumulative bonus for Riley' },
+        { dayOffset: 21, dueDate: '2026-11-07', task: 'Complete digital Re-KYC for mutual fund family portfolio for Riley' },
+        { dayOffset: 45, dueDate: '2026-12-01', task: 'Rebalance tax deductions under Section 80D and Section 80C for Riley' }
+      ],
+      spokenBrief: "I've prepared an estate and healthcare roadmap for Riley with 3 scheduled milestone tasks."
+    };
+    return { text: '🎯 Life-Event Roadmap Orchestrated: Relocation & Estate for Riley', data };
+  }
+
+  // Justin (default)
+  const data = {
+    title: 'Retirement & Senior Transition for Justin',
+    memberName: 'Justin',
+    relation: 'father',
+    birthYear: 1968,
+    statusTransition: 'Employed ➔ Retired Senior',
+    unlockedSchemes: [
+      { status: 'ALMOST ELIGIBLE', name: 'Senior Citizens Savings Scheme', detail: 'Justin qualifies around age 60.' }
+    ],
+    vaultDocs: ['Driving Licence', 'Passport'],
+    missingDocs: ['Age proof', 'Aadhaar card', 'Bank account passbook', 'Pension/Superannuation Order'],
+    phases: [
+      { dayOffset: 7, dueDate: '2026-10-24', task: 'Consolidate pension papers & superannuation documents for Justin' },
+      { dayOffset: 30, dueDate: '2026-11-16', task: 'Apply for Senior Citizens Savings Scheme (SCSS) / deposit setup for Justin' },
+      { dayOffset: 60, dueDate: '2026-12-16', task: 'Review health coverage & register for Ayushman Vay Vandana card for Justin' },
+      { dayOffset: 90, dueDate: '2027-01-15', task: 'Submit annual Digital Life Certificate (Jeevan Pramaan) for Justin' }
+    ],
+    spokenBrief: "I've prepared a phased retirement roadmap for Justin with 4 scheduled milestone tasks."
+  };
+  return { text: '🎯 Life-Event Roadmap Orchestrated: Retirement & Senior Transition for Justin', data };
+}
+
 

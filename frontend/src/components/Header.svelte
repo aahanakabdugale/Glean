@@ -1,36 +1,39 @@
 <script>
-  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList, alexaMicEnabled, toggleAlexaMic, toggleTracePanel, toolCallTraces } from '../lib/store.js';
-  import { User, Users, Activity, Mic, MicOff, LayoutGrid, Settings, Sun, Moon } from '@lucide/svelte';
+  import { theme, toggleTheme, connectionStatus, activeView, activePersona, familyMembersList, alexaMicEnabled, toggleAlexaMic, toggleTracePanel, toolCallTraces, settings } from '../lib/store.js';
+  import { User, Users, Activity, Mic, MicOff, LayoutGrid, Settings, Sun, Moon, X, CheckCircle2, AlertCircle, RotateCw } from '@lucide/svelte';
+  import Logo from './Logo.svelte';
+  import { testConnection } from '../lib/mcp.js';
+
+  let showStatusPopover = false;
+  let testingConnection = false;
+  let testResult = '';
+
+  async function runPingTest() {
+    testingConnection = true;
+    testResult = '';
+    try {
+      const ok = await testConnection();
+      testResult = ok ? 'Connected successfully (200 OK)' : 'Could not reach server';
+    } catch (e) {
+      testResult = 'Connection test failed';
+    } finally {
+      testingConnection = false;
+    }
+  }
+
+  function handleKeydown(e) {
+    if (e.key === 'Escape' && showStatusPopover) {
+      showStatusPopover = false;
+    }
+  }
 </script>
 
+<svelte:window on:keydown={handleKeydown} />
+
 <header class="top-bar">
-  <!-- Left: Glean Brand (Logomark + Wordmark) -->
+  <!-- Left: Glean Brand (Orb Icon + Wordmark) -->
   <button class="brand-btn" on:click={() => activeView.set('chat')} aria-label="Go to Glean home">
-    <div class="logo-icon-wrap" aria-hidden="true">
-      <svg class="glean-mark" width="34" height="34" viewBox="0 0 34 34" fill="none">
-        <defs>
-          <linearGradient id="glean-grad-light" x1="2" y1="2" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#4285F4" />
-            <stop offset="100%" stop-color="#1A73E8" />
-          </linearGradient>
-          <linearGradient id="glean-grad-dark" x1="2" y1="2" x2="32" y2="32" gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stop-color="#00CAFF" />
-            <stop offset="100%" stop-color="#2A6CFF" />
-          </linearGradient>
-        </defs>
-        <!-- Rounded Squircle Badge -->
-        <rect width="34" height="34" rx="10" class="tile-bg" />
-        <!-- Layered Paperwork Sheets -->
-        <rect x="8" y="7" width="13" height="17" rx="2.5" fill="white" opacity="0.45" />
-        <rect x="12" y="10" width="14" height="17" rx="2.5" fill="white" />
-        <!-- Document Content Lines -->
-        <path d="M15 14.5H22.5" stroke="#1A73E8" class="doc-line" stroke-width="1.8" stroke-linecap="round" />
-        <path d="M15 18H20.5" stroke="#1A73E8" class="doc-line" stroke-width="1.8" stroke-linecap="round" />
-        <!-- Accent Sparkle -->
-        <path d="M9 20C10.5 20 11.5 19 11.5 17.5C11.5 19 12.5 20 14 20C12.5 20 11.5 21 11.5 22.5C11.5 21 10.5 20 9 20Z" fill="white" opacity="0.9" />
-      </svg>
-    </div>
-    <span class="logo-wordmark">GLEAN</span>
+    <Logo size={32} fontSize={22} fontWeight={500} />
   </button>
 
   <!-- Center: Member / Persona Switcher -->
@@ -66,18 +69,121 @@
 
   <!-- Right: Status pills & Labeled Controls -->
   <div class="right-group">
-    <!-- Server connection status -->
-    <button
-      class="status-pill {$connectionStatus === 'online' ? 'ok' : 'soon'}"
-      on:click={toggleTracePanel}
-      aria-label="Server status: {$connectionStatus}. Click for trace panel."
-      title="Click to view MCP Traces"
-    >
-      <span class="status-dot"></span>
-      <span class="status-text">
-        {$connectionStatus === 'online' ? 'Live MCP HTTP' : 'Demo Mode'}
-      </span>
-    </button>
+    <!-- Server connection status Pill & Popover -->
+    <div class="status-pill-wrapper">
+      <button
+        class="status-pill {$connectionStatus === 'online' ? 'ok' : 'soon'}"
+        class:active={showStatusPopover}
+        on:click={() => showStatusPopover = !showStatusPopover}
+        aria-label="Server status: {$connectionStatus}. Click for connection details."
+        aria-expanded={showStatusPopover}
+        title="MCP Server Status: {$connectionStatus === 'online' ? 'Live MCP HTTP (Connected)' : 'Demo Mode'} — Click for details"
+      >
+        <span class="status-dot"></span>
+        <span class="status-text">
+          {$connectionStatus === 'online' ? 'Live MCP HTTP' : 'Demo Mode'}
+        </span>
+      </button>
+
+      {#if showStatusPopover}
+        <!-- Backdrop to close on click outside -->
+        <button
+          type="button"
+          class="popover-backdrop"
+          on:click={() => showStatusPopover = false}
+          aria-label="Close connection status"
+          tabindex="-1"
+        ></button>
+
+        <div class="status-popover" role="dialog" aria-label="MCP Server Connection Details">
+          <div class="popover-header">
+            <div class="popover-title-row">
+              <span class="status-dot {$connectionStatus === 'online' ? 'ok' : 'soon'}"></span>
+              <span class="popover-title">MCP Server Connection</span>
+            </div>
+            <button
+              type="button"
+              class="popover-close-btn"
+              on:click={() => showStatusPopover = false}
+              aria-label="Close"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <div class="popover-body">
+            <div class="popover-badge-row">
+              <span class="popover-status-badge {$connectionStatus === 'online' ? 'online' : 'demo'}">
+                {$connectionStatus === 'online' ? '● Live Streamable HTTP' : '● Demo Mode (Fallback)'}
+              </span>
+              {#if $connectionStatus === 'online'}
+                <span class="popover-stat-tag">Active</span>
+              {/if}
+            </div>
+
+            <div class="popover-info-grid">
+              <div class="info-item">
+                <span class="info-label">Endpoint URL</span>
+                <span class="info-val mono" title={$settings.serverUrl}>
+                  {$settings.serverUrl || 'http://127.0.0.1:8000/mcp'}
+                </span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Transport</span>
+                <span class="info-val">Streamable HTTP (JSON-RPC 2.0)</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">MCP Protocol</span>
+                <span class="info-val">2024-11-05 Specification</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">Registered Tools</span>
+                <span class="info-val">11 Tools (Family, Schemes, Vault)</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">SSE Push Broker</span>
+                <span class="info-val">/api/ambient/events (Live)</span>
+              </div>
+            </div>
+
+            {#if testResult}
+              <div class="test-feedback" class:ok={testResult.includes('success')}>
+                {#if testResult.includes('success')}
+                  <CheckCircle2 size={13} />
+                {:else}
+                  <AlertCircle size={13} />
+                {/if}
+                <span>{testResult}</span>
+              </div>
+            {/if}
+          </div>
+
+          <div class="popover-footer">
+            <button
+              type="button"
+              class="popover-action-btn secondary"
+              on:click={runPingTest}
+              disabled={testingConnection}
+            >
+              <RotateCw size={13} class={testingConnection ? 'spin' : ''} />
+              <span>{testingConnection ? 'Pinging…' : 'Ping Server'}</span>
+            </button>
+
+            <button
+              type="button"
+              class="popover-action-btn primary"
+              on:click={() => {
+                showStatusPopover = false;
+                activeView.set('settings');
+              }}
+            >
+              <Settings size={13} />
+              <span>Server Settings</span>
+            </button>
+          </div>
+        </div>
+      {/if}
+    </div>
 
     <!-- Trace drawer toggle -->
     <button
@@ -158,71 +264,31 @@
     justify-content: space-between;
     height: 60px;
     padding: 0 var(--sp-16);
-    background: transparent;
+    background: var(--surface);
     border-bottom: 1px solid var(--line-soft);
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 40;
-    backdrop-filter: blur(12px);
-    transition: border-color var(--dur-base) var(--ease);
+    transition: border-color var(--dur-base) var(--ease), background-color var(--dur-base) var(--ease);
   }
 
   .brand-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: var(--sp-12);
     border: none;
     background: transparent;
     cursor: pointer;
     padding: 0;
     text-decoration: none;
-    transition: transform var(--dur-fast) var(--ease);
+    transition: transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
   }
   .brand-btn:hover {
-    transform: scale(1.03);
+    transform: scale(1.02);
+    opacity: 0.95;
   }
-
-  .logo-icon-wrap {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 10px;
-    box-shadow: 0 2px 8px rgba(66, 133, 244, 0.25);
-    flex-shrink: 0;
-  }
-  :global([data-theme="dark"]) .logo-icon-wrap {
-    box-shadow: 0 2px 12px rgba(0, 202, 255, 0.25);
-  }
-
-  /* Logomark background per theme */
-  .tile-bg {
-    fill: url(#glean-grad-light);
-  }
-  :global([data-theme="dark"]) .tile-bg {
-    fill: url(#glean-grad-dark);
-  }
-
-  :global([data-theme="dark"]) .doc-line {
-    stroke: #2A6CFF;
-  }
-
-  /* Wordmark: 16px, weight 600, letter-spacing .2em */
-  .logo-wordmark {
-    font-family: var(--font-ui);
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    transition: color var(--dur-base) var(--ease);
-  }
-
-  /* Light theme: Blue */
-  :global([data-theme="light"]) .logo-wordmark {
-    color: var(--accent);
-  }
-
-  /* Dark theme: White */
-  :global([data-theme="dark"]) .logo-wordmark {
-    color: #FFFFFF;
+  .brand-btn:focus-visible {
+    outline: 2px solid var(--logo-core);
+    outline-offset: 4px;
+    border-radius: 6px;
   }
 
   .center-group {
@@ -262,6 +328,15 @@
     color: var(--text);
     cursor: pointer;
     outline: none;
+    color-scheme: inherit;
+  }
+
+  .persona-select option {
+    background-color: var(--surface, #0C1424);
+    color: var(--text, #E8F4FF);
+    font-family: var(--font-ui);
+    font-size: var(--fs-small);
+    padding: 6px 12px;
   }
 
   .right-group {
@@ -300,6 +375,231 @@
   }
   .status-pill.soon .status-dot {
     background: var(--soon);
+  }
+  .status-pill.active {
+    border-color: var(--accent);
+    background: var(--surface-2);
+  }
+
+  /* Status Pill Popover */
+  .status-pill-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .popover-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: transparent;
+    border: none;
+    cursor: default;
+  }
+
+  .status-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-card, 12px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popoverFadeIn 140ms ease-out;
+  }
+
+  @keyframes popoverFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--surface-2);
+  }
+
+  .popover-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .popover-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .popover-close-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s ease, background-color 0.15s ease;
+  }
+  .popover-close-btn:hover {
+    color: var(--text);
+    background: var(--line-soft);
+  }
+
+  .popover-body {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .popover-badge-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .popover-status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--r-pill);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .popover-status-badge.online {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+    border: 1px solid var(--ok);
+  }
+  .popover-status-badge.demo {
+    background: var(--soon-bg);
+    color: var(--soon-text);
+    border: 1px solid var(--soon);
+  }
+
+  .popover-stat-tag {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .popover-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--line-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .info-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  .info-val {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+  }
+  .info-val.mono {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    word-break: break-all;
+  }
+
+  .test-feedback {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    padding: 6px 10px;
+    border-radius: 6px;
+    background: var(--soon-bg);
+    color: var(--soon-text);
+  }
+  .test-feedback.ok {
+    background: var(--ok-bg);
+    color: var(--ok-text);
+  }
+
+  .popover-footer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-top: 1px solid var(--line-soft);
+    background: var(--surface-2);
+  }
+
+  .popover-action-btn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .popover-action-btn.secondary {
+    border: 1px solid var(--line-soft);
+    background: var(--surface);
+    color: var(--text);
+  }
+  .popover-action-btn.secondary:hover {
+    border-color: var(--line);
+    background: var(--surface-2);
+  }
+  .popover-action-btn.primary {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--btn-primary-text, #fff);
+  }
+  .popover-action-btn.primary:hover {
+    background: var(--accent-2);
+  }
+
+  :global(.spin) {
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
   }
 
   @media (max-width: 720px) {

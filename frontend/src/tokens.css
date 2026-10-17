@@ -4,6 +4,7 @@
    ============================================================ */
 
 :root, [data-theme="light"] {
+  color-scheme: light;
   --bg: #FFFFFF;
   --bg-glow: radial-gradient(620px 420px at 50% 38%, #E8F0FE 0%, #FFFFFF 72%);
   --surface: #FFFFFF;
@@ -40,9 +41,29 @@
   --badge-info-color: var(--info-text);
   --badge-neutral-bg: var(--line-soft);
   --badge-neutral-color: var(--text-soft);
+
+  /* Center Sheet Design Tokens (Light) */
+  --cs-bg: #fafbff;
+  --cs-pill: #ffffff;
+  --cs-pill-border: #e3e8f3;
+  --cs-ink: #1b2438;
+  --cs-muted: #667394;
+  --cs-accent: #3b82f6;
+  --cs-on-accent: #ffffff;
+  --cs-sheet: rgba(255,255,255,.88);
+  --cs-dot: #dde3f0;
+  --cs-glow: rgba(59,130,246,.28);
+
+  /* Glean Logo Tokens */
+  --logo-halo: #E3EDFD;
+  --logo-ring: #A9C7FA;
+  --logo-core: #2F6BEB;
+  --logo-shine: #FFFFFF;
+  --logo-text: #1B2236;
 }
 
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #05070D;
   --bg-glow: radial-gradient(620px 420px at 50% 38%, #0B2A55 0%, #05070D 72%);
   --surface: #0C1424;
@@ -78,11 +99,35 @@
   --badge-ok-color: var(--ok);
   --badge-info-color: var(--info);
   --badge-neutral-bg: rgba(255,255,255,.08);
-  --badge-neutral-color: var(--text-soft);
+  /* Center Sheet Design Tokens (Dark) */
+  --cs-bg: #04091a;
+  --cs-pill: #0d1730;
+  --cs-pill-border: #1b2a4a;
+  --cs-ink: #f1f5ff;
+  --cs-muted: #8ea0c4;
+  --cs-accent: #18b9ff;
+  --cs-on-accent: #03121f;
+  --cs-sheet: rgba(13,23,48,.78);
+  --cs-dot: #12203d;
+  --cs-glow: rgba(24,185,255,.35);
+
+  /* Glean Logo Tokens */
+  --logo-halo: rgba(79,134,247,0.16);
+  --logo-ring: rgba(79,134,247,0.38);
+  --logo-core: #4F86F7;
+  --logo-shine: #FFFFFF;
+  --logo-text: #F1F5FF;
 }
 
 /* ---------- SHARED SCALES (THEME-INDEPENDENT) ---------- */
 :root {
+  /* Center Sheet Status Colors */
+  --cs-amber: #fbbf24;
+  --cs-red: #f87171;
+  --cs-green: #34d399;
+  --cs-violet: #a78bfa;
+  --cs-cyan: #22d3ee;
+  --cs-blue: #38bdf8;
   /* Typography */
   --font-ui: 'Outfit Variable', system-ui, -apple-system, sans-serif;
   --font-mono: 'Roboto Mono', ui-monospace, monospace;

@@ -48,6 +48,35 @@
   .orb-btn.hero {
     width: 140px;
     height: 140px;
+    transition: width 400ms var(--ease), height 400ms var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .orb-btn.sheet {
+    width: 64px;
+    height: 64px;
+    transition: width 400ms var(--ease), height 400ms var(--ease), transform var(--dur-fast) var(--ease);
+  }
+  .orb-btn.sheet .ring {
+    display: none;
+  }
+  .orb-btn.sheet .orb-core {
+    background: var(--orb);
+    box-shadow: 0 0 16px rgba(47, 107, 235, 0.40);
+  }
+  :global([data-theme="dark"]) .orb-btn.sheet .orb-core {
+    background: var(--orb);
+    box-shadow: 0 0 18px rgba(79, 134, 247, 0.45);
+  }
+  .orb-btn.sheet .highlight-cap {
+    top: 5%;
+    left: 15%;
+    width: 70%;
+    height: 45%;
+    border-radius: 50%;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 100%);
+    opacity: 0.6;
+  }
+  :global([data-theme="dark"]) .orb-btn.sheet .highlight-cap {
+    opacity: 0.25;
   }
   .orb-btn.mini {
     width: 36px;

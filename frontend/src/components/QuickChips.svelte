@@ -1,6 +1,6 @@
 <script>
   import { activePersona } from '../lib/store.js';
-  import { ChevronDown, Sparkles } from '@lucide/svelte';
+  import { ChevronDown } from '@lucide/svelte';
 
   export let onChipClick = (/** @type {string} */ _text) => {};
 
@@ -12,7 +12,7 @@
 
   $: primaryPills = [
     { label: 'What is expiring soon?', prompt: 'What documents are expiring soon?' },
-    { label: 'Check schemes', prompt: `What schemes does ${elder} qualify for?` },
+    { label: `Check schemes for ${elder}`, prompt: `What schemes does ${elder} qualify for?` },
   ];
 
   $: morePills = [
@@ -20,8 +20,9 @@
     { label: 'Morning briefing', prompt: $activePersona && $activePersona !== 'all' ? `Give me the morning briefing for ${$activePersona}` : 'Give me the full family briefing' },
     { label: 'Annual family review', prompt: 'Run the annual family review' },
     { label: 'Ayushman checklist', prompt: 'What documents are needed for Ayushman Vay Vandana?' },
-    { label: 'Family member roster', prompt: 'List all family members' },
+    { label: 'Family roster', prompt: 'List all family members' },
     { label: 'Tasks in next 30 days', prompt: 'What tasks are coming up in the next 30 days?' },
+    { label: 'Family dashboard', prompt: 'Show me the family dashboard' },
   ];
 </script>
 
@@ -37,7 +38,7 @@
       </button>
     {/each}
 
-    <!-- "More" popover / dropdown button -->
+    <!-- "More Actions" popover / dropdown button -->
     <button
       type="button"
       class="vr-pill more-btn"
@@ -46,7 +47,7 @@
       aria-expanded={showMore}
       aria-label="More suggested actions"
     >
-      <span>More</span>
+      <span>More Actions</span>
       <ChevronDown size={14} class="chevron {showMore ? 'open' : ''}" />
     </button>
   </div>
