@@ -26,10 +26,11 @@ import os
 import uvicorn
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.staticfiles import StaticFiles
 
 from backend import db
+from backend.ambient import ambient_broker, evaluate_proactive_alerts
 from backend.app import mcp
 from backend.security import validate_origin, validate_token
 
@@ -129,6 +130,26 @@ def build_app():
     # any MCP processing.
     app.add_middleware(GleanSecurityMiddleware)
 
+    # --- Proactive Ambient Push & SSE endpoints -------------------------
+    async def ambient_events_endpoint(request: Request):
+        q = ambient_broker.subscribe()
+        return StreamingResponse(
+            ambient_broker.event_generator(q),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+
+    async def ambient_alerts_json(request: Request):
+        alerts = evaluate_proactive_alerts()
+        return JSONResponse({"alerts": alerts, "count": len(alerts)})
+
+    app.add_route("/api/ambient/events", ambient_events_endpoint, methods=["GET"])
+    app.add_route("/api/ambient/alerts", ambient_alerts_json, methods=["GET"])
+
     # Locate the built frontend (alexa-simulator/dist).
     # Allows judges to run `python server.py` directly without Node.js.
     here = os.path.dirname(os.path.abspath(__file__))
@@ -151,8 +172,8 @@ def build_app():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    host = os.environ.get("GLEAN_HOST", "127.0.0.1")
-    port = int(os.environ.get("GLEAN_PORT", "8000"))
+    host = os.environ.get("GLEAN_HOST", os.environ.get("HOST", "0.0.0.0"))
+    port = int(os.environ.get("PORT", os.environ.get("GLEAN_PORT", "8000")))
 
     # Initialise the database (creates tables if they do not exist).
     db.init_db(db.get_connection())

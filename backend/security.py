@@ -137,7 +137,14 @@ def validate_origin(
         # No Origin header → not a cross-origin browser request → allow.
         return True, None
 
-    patterns = allowed_origins if allowed_origins is not None else DEFAULT_ALLOWED_ORIGINS
+    if allowed_origins is not None:
+        patterns = allowed_origins
+    else:
+        env_origins = os.environ.get("GLEAN_ALLOWED_ORIGINS")
+        if env_origins:
+            patterns = [p.strip() for p in env_origins.split(",") if p.strip()]
+        else:
+            patterns = DEFAULT_ALLOWED_ORIGINS
 
     for pattern in patterns:
         if fnmatch.fnmatch(origin, pattern):
