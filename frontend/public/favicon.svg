@@ -1,22 +1,10 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 6 36 36" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
   <style>
-    :root {
-      --fav-ring: #A9C7FA;
-      --fav-core: #2F6BEB;
-      --fav-shine: #FFFFFF;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --fav-ring: rgba(79, 134, 247, 0.45);
-        --fav-core: #4F86F7;
-        --fav-shine: #FFFFFF;
-      }
-    }
+    .h{fill:#DCE8FD}.r{fill:#A9C7FA}.c{fill:#2F6BEB}
+    @media (prefers-color-scheme: dark){.h{fill:#27406F}.r{fill:#3B66B8}.c{fill:#5B93FF}}
   </style>
-  <!-- Middle Ring (r=18) -->
-  <circle cx="24" cy="24" r="18" fill="var(--fav-ring)"/>
-  <!-- Core (r=12) -->
-  <circle cx="24" cy="24" r="12" fill="var(--fav-core)"/>
-  <!-- Glossy highlight on core -->
-  <ellipse cx="20.5" cy="19" rx="5" ry="3" fill="var(--fav-shine)" opacity="0.6"/>
+  <circle class="h" cx="24" cy="24" r="24"/>
+  <circle class="r" cx="24" cy="24" r="19"/>
+  <circle class="c" cx="24" cy="24" r="13"/>
+  <ellipse cx="20" cy="18.5" rx="5.5" ry="3.2" fill="#fff" opacity="0.65" transform="rotate(-20 20 18.5)"/>
 </svg>
