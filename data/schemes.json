@@ -2,6 +2,7 @@
   {
     "id": "ignoaps_mh",
     "name": "Indira Gandhi National Old Age Pension Scheme (Maharashtra)",
+    "country": "IN",
     "state": "Maharashtra",
     "summary": "Monthly pension for older people from BPL families.",
     "rules": { "min_age": 65, "requires": ["bpl"] },
@@ -13,6 +14,7 @@
   {
     "id": "ayushman_vay_vandana",
     "name": "Ayushman Vay Vandana Card (AB PM-JAY)",
+    "country": "IN",
     "state": "All India",
     "summary": "Health cover for every senior citizen aged 70 and above, whatever their income.",
     "rules": { "min_age": 70 },
@@ -24,6 +26,7 @@
   {
     "id": "apy",
     "name": "Atal Pension Yojana",
+    "country": "IN",
     "state": "All India",
     "summary": "Guaranteed monthly pension of Rs 1,000 to 5,000 after age 60.",
     "rules": { "min_age": 18, "max_age": 40, "excludes": ["income_tax_payer"] },
@@ -35,6 +38,7 @@
   {
     "id": "scss",
     "name": "Senior Citizens Savings Scheme",
+    "country": "IN",
     "state": "All India",
     "summary": "Government-backed savings deposit for senior citizens, at post offices and banks.",
     "rules": { "min_age": 60 },
@@ -46,6 +50,7 @@
   {
     "id": "pmjjby",
     "name": "Pradhan Mantri Jeevan Jyoti Bima Yojana (PMJJBY)",
+    "country": "IN",
     "state": "All India",
     "summary": "Affordable renewable life insurance cover of Rs 2,00,000 for death due to any cause.",
     "rules": { "min_age": 18, "max_age": 50, "requires": ["bank_account"] },
@@ -57,6 +62,7 @@
   {
     "id": "pmsby",
     "name": "Pradhan Mantri Suraksha Bima Yojana (PMSBY)",
+    "country": "IN",
     "state": "All India",
     "summary": "Accident insurance scheme offering accidental death and disability cover of up to Rs 2,00,000.",
     "rules": { "min_age": 18, "max_age": 70, "requires": ["bank_account"] },
@@ -68,6 +74,7 @@
   {
     "id": "ssy",
     "name": "Sukanya Samriddhi Yojana (SSY)",
+    "country": "IN",
     "state": "All India",
     "summary": "Government-backed small savings scheme for the girl child offering high interest and tax exemptions under Section 80C.",
     "rules": { "max_age": 10, "requires": ["girl_child"] },
@@ -79,12 +86,61 @@
   {
     "id": "pm_kisan",
     "name": "PM Kisan Samman Nidhi (PM-KISAN)",
+    "country": "IN",
     "state": "All India",
-    "summary": "Direct income support of Rs 6,000 per year in three equal installments of Rs 2,000 to all landholding farmer families.",
+    "summary": "Direct income support of Rs 6,00,0 per year in three equal installments of Rs 2,000 to all landholding farmer families.",
     "rules": { "min_age": 18, "requires": ["farmer"], "excludes": ["income_tax_payer"] },
     "documents": ["Aadhaar card", "Land ownership proof / Record of Rights (Khasra/Khatauni)", "Aadhaar-linked bank account passbook", "Active mobile number for OTP"],
     "notes": "Institutional landholders, income tax payers, and serving or retired government employees are not eligible.",
     "source_url": "https://pmkisan.gov.in/",
     "apply_url": "https://pmkisan.gov.in/RegistrationFormUpdated.aspx"
+  },
+  {
+    "id": "us_medicare",
+    "name": "Medicare (Parts A & B)",
+    "country": "US",
+    "state": "Federal (US)",
+    "summary": "Federal health insurance program for seniors aged 65 and older, covering inpatient hospital stays (Part A) and outpatient medical care (Part B).",
+    "rules": { "min_age": 65 },
+    "documents": ["Proof of Age / U.S. Citizenship or Legal Permanent Residence", "Social Security Card", "Form CMS-40B (Application for Enrollment in Medicare Part B)"],
+    "notes": "Initial Enrollment Period (IEP) starts 3 months before turning 65. If enrolled in Medicare Part A, IRS rules prohibit new contributions to a Health Savings Account (HSA).",
+    "source_url": "https://www.usa.gov/medicare",
+    "apply_url": "https://www.medicare.gov/basics/get-started-with-medicare"
+  },
+  {
+    "id": "us_social_security",
+    "name": "Social Security Retirement Benefits (OASI)",
+    "country": "US",
+    "state": "Federal (US)",
+    "summary": "Federal retirement pension benefits available as early as age 62, with full retirement age between 66 and 67 depending on birth year.",
+    "rules": { "min_age": 62 },
+    "documents": ["Social Security Card", "Certified Birth Certificate or Proof of Age", "Recent W-2 forms or self-employment tax return (Form 1040)", "Bank direct deposit routing information"],
+    "notes": "Earliest claiming age is 62 (at a permanent reduced rate). Full retirement age (FRA) is 67 for those born in 1960 or later. Delaying benefits up to age 70 yields delayed retirement credits.",
+    "source_url": "https://www.usa.gov/what-is-social-security",
+    "apply_url": "https://www.usa.gov/social-security"
+  },
+  {
+    "id": "us_snap",
+    "name": "Supplemental Nutrition Assistance Program (SNAP)",
+    "country": "US",
+    "state": "Federal (US)",
+    "summary": "Federal food assistance benefits via Electronic Benefits Transfer (EBT) card for eligible low-income individuals and families.",
+    "rules": { "requires": ["low_income"] },
+    "documents": ["Proof of Identity (State Driver's License or Government Photo ID)", "Proof of Income (Recent pay stubs or tax statement)", "Household expense proof (utility bills or lease agreement)"],
+    "notes": "Gross monthly household income is generally required to be at or below 130% of the federal poverty guideline. Exact threshold varies by state and household size.",
+    "source_url": "https://www.usa.gov/food-stamps",
+    "apply_url": "https://www.benefits.gov/benefit/361"
+  },
+  {
+    "id": "us_catchup_401k",
+    "name": "401(k) & IRA Catch-Up Contributions (SECURE 2.0)",
+    "country": "US",
+    "state": "Federal (US)",
+    "summary": "Federal tax policy allowing individuals age 50 and older to make additional catch-up contributions above standard annual elective deferral limits.",
+    "rules": { "min_age": 50, "requires": ["employed"] },
+    "documents": ["Employer Retirement Plan Statement (401k/403b)", "Form W-2 or prior year tax return", "Direct Payroll Deduction Catch-Up Election Form"],
+    "notes": "Under IRS regulations and the SECURE 2.0 Act, participants turning age 50 or older during the calendar year can make additional catch-up contributions to employer-sponsored plans and traditional/Roth IRAs.",
+    "source_url": "https://www.irs.gov/retirement-plans/plan-participant-employee/retirement-topics-catch-up-contributions",
+    "apply_url": "https://www.irs.gov/retirement-plans/cola-increases-for-dollar-limitations-on-benefits-and-contributions"
   }
 ]

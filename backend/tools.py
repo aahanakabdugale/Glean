@@ -42,6 +42,63 @@ def add_family_member(name: str, relation: str, birth_year: int, status: str) ->
 
 
 @mcp.tool()
+def remove_family_member(name: str) -> str:
+    """Remove a person from the family list by name."""
+    name = name.strip()
+    if not name:
+        return "Please provide a name to remove."
+
+    try:
+        conn = db.get_connection()
+        row = conn.execute(
+            "SELECT id FROM family_members WHERE LOWER(name) = LOWER(?)", (name,)
+        ).fetchone()
+        if not row:
+            return f"I couldn't find anyone called {name}."
+
+        m_id = row["id"]
+        conn.execute("DELETE FROM tasks WHERE member_id = ?", (m_id,))
+        conn.execute("DELETE FROM documents WHERE member_id = ?", (m_id,))
+        conn.execute("DELETE FROM family_members WHERE id = ?", (m_id,))
+        conn.commit()
+    except Exception as exc:
+        logger.error("remove_family_member failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+    return f"Removed {name} from the family list."
+
+
+@mcp.tool()
+def reset_family_roster() -> str:
+    """Reset family members to the canonical demo roster (Chandler, Amy, Justin, Riley, Jace, Gwen)."""
+    try:
+        conn = db.get_connection()
+        demo_members = [
+            ("Chandler", "grandfather", 1950, "retired"),
+            ("Amy", "grandmother", 1953, "retired"),
+            ("Justin", "father", 1968, "employed"),
+            ("Riley", "mother", 1972, "employed"),
+            ("Jace", "son", 2000, "family admin"),
+            ("Gwen", "daughter", 2003, "family admin"),
+        ]
+        for name, relation, birth_year, status in demo_members:
+            existing = conn.execute(
+                "SELECT id FROM family_members WHERE LOWER(name) = LOWER(?)", (name,)
+            ).fetchone()
+            if not existing:
+                conn.execute(
+                    "INSERT INTO family_members (name, relation, birth_year, status) VALUES (?, ?, ?, ?)",
+                    (name, relation, birth_year, status),
+                )
+        conn.commit()
+        db.align_demo_dates(conn)
+        return "Reset family roster to canonical demo dataset."
+    except Exception as exc:
+        logger.error("reset_family_roster failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+
+@mcp.tool()
 def list_family_members() -> str:
     """List everyone in the family with their relation, birth year and status."""
     try:
@@ -98,9 +155,10 @@ def add_document(doc_type: str, owner: str, expiry_date: str) -> str:
 
 
 @mcp.tool()
-def get_expiring_documents(days: int = 30) -> str:
+def get_expiring_documents(days: int = 30, member_name: str = "") -> str:
     """List documents that are already expired or will expire within the next N days (default 30),
-    soonest first. Use when the user asks what is expiring or what needs renewing."""
+    soonest first. Optional member_name filters documents for a specific person.
+    Use when the user asks what is expiring or what needs renewing."""
     if not 0 <= days <= 3650:
         return "Please give a number of days between 0 and 3650."
 
@@ -109,19 +167,26 @@ def get_expiring_documents(days: int = 30) -> str:
 
     try:
         conn = db.get_connection()
-        rows = conn.execute(
+        db.align_demo_dates(conn)
+        query = (
             "SELECT m.name, d.doc_type, d.expiry_date "
             "FROM documents d JOIN family_members m ON m.id = d.member_id "
             "WHERE d.expiry_date <= ? "
-            "ORDER BY d.expiry_date",
-            (cutoff.isoformat(),),
-        ).fetchall()
+        )
+        params = [cutoff.isoformat()]
+        if member_name and member_name.strip():
+            query += "AND LOWER(m.name) = LOWER(?) "
+            params.append(member_name.strip())
+
+        query += "ORDER BY d.expiry_date"
+        rows = conn.execute(query, tuple(params)).fetchall()
     except Exception as exc:
         logger.error("get_expiring_documents failed: %s", exc)
         return "Something went wrong. Please try again."
 
+    who = f" for {member_name.strip()}" if member_name and member_name.strip() else ""
     if not rows:
-        return f"Nothing is expiring in the next {days} days."
+        return f"Nothing is expiring in the next {days} days{who}."
 
     lines = []
     for r in rows:
@@ -163,6 +228,19 @@ def add_task(title: str, due_date: str, owner: str = "") -> str:
                 return f"I don't know anyone called {owner}. Add them first."
             member_id = member["id"]
 
+        # Check if identical pending task already exists
+        existing = conn.execute(
+            "SELECT id FROM tasks WHERE title = ? AND ((member_id = ?) OR (member_id IS NULL AND ? IS NULL)) AND done = 0",
+            (title, member_id, member_id),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE tasks SET due_date = ? WHERE id = ?",
+                (due.isoformat(), existing["id"]),
+            )
+            conn.commit()
+            return f"Task updated: {title}, due {due.isoformat()}."
+
         conn.execute(
             "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
             (title, due.isoformat(), member_id),
@@ -176,9 +254,107 @@ def add_task(title: str, due_date: str, owner: str = "") -> str:
 
 
 @mcp.tool()
-def list_upcoming_tasks(days: int = 30) -> str:
+def complete_task(task_title: str = "", member_name: str = "", task_id: int = 0) -> str:
+    """Mark a pending task as completed (done = 1).
+    Can match by task_id directly, or by task_title (fuzzy/case-insensitive) and optional member_name.
+    Use when the user marks a task completed, finishes a task, or asks to check off a task."""
+    try:
+        conn = db.get_connection()
+
+        if task_id and int(task_id) > 0:
+            row = conn.execute(
+                "SELECT t.id, t.title, m.name FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id WHERE t.id = ?",
+                (int(task_id),)
+            ).fetchone()
+            if not row:
+                return f"Task ID {task_id} not found."
+            conn.execute("UPDATE tasks SET done = 1 WHERE id = ?", (int(task_id),))
+            conn.commit()
+            who_str = f" for {row['name']}" if row['name'] else ""
+            return f"Completed: '{row['title']}'{who_str}."
+
+        title = (task_title or "").strip()
+        if not title:
+            return "Please tell me which task to complete."
+
+        # Find pending tasks (done = 0)
+        query = (
+            "SELECT t.id, t.title, t.due_date, m.name "
+            "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+            "WHERE t.done = 0 "
+        )
+        params = []
+        if member_name and member_name.strip():
+            query += "AND LOWER(m.name) = LOWER(?) "
+            params.append(member_name.strip())
+
+        candidates = conn.execute(query, tuple(params)).fetchall()
+        if not candidates:
+            # Check if perhaps it was already marked done
+            already_done = conn.execute(
+                "SELECT t.id, t.title, m.name FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+                "WHERE t.done = 1 AND LOWER(t.title) LIKE ?",
+                (f"%{title.lower()}%",)
+            ).fetchone()
+            if already_done:
+                who = f" for {already_done['name']}" if already_done['name'] else ""
+                return f"'{already_done['title']}'{who} is already marked as completed."
+            who = f" for {member_name.strip()}" if member_name and member_name.strip() else ""
+            return f"No pending tasks found{who}."
+
+        title_lower = title.lower()
+
+        # 1. Exact title match (case-insensitive)
+        matched = [c for c in candidates if c["title"].lower() == title_lower]
+
+        # 2. Substring match
+        if not matched:
+            matched = [
+                c for c in candidates
+                if title_lower in c["title"].lower() or c["title"].lower() in title_lower
+            ]
+
+        # 3. Token-overlap match (ignoring common stopwords)
+        if not matched:
+            stopwords = {"the", "a", "an", "for", "to", "in", "on", "at", "and", "or", "task", "done", "completed", "finish", "finished", "mark", "check"}
+            query_tokens = set(title_lower.split()) - stopwords
+            if query_tokens:
+                best_score = 0
+                best_c = None
+                for c in candidates:
+                    cand_tokens = set(c["title"].lower().split()) - stopwords
+                    overlap = len(query_tokens.intersection(cand_tokens))
+                    if overlap > best_score:
+                        best_score = overlap
+                        best_c = c
+                if best_c and best_score >= 1:
+                    matched = [best_c]
+
+        if not matched:
+            who = f" for {member_name.strip()}" if member_name and member_name.strip() else ""
+            return f"Couldn't find any pending task matching '{task_title}'{who}."
+
+        matched_ids = [m["id"] for m in matched]
+        placeholders = ",".join("?" for _ in matched_ids)
+        conn.execute(
+            f"UPDATE tasks SET done = 1 WHERE id IN ({placeholders})",
+            tuple(matched_ids),
+        )
+        conn.commit()
+
+        best = matched[0]
+        who_str = f" for {best['name']}" if best['name'] else ""
+        return f"Completed: '{best['title']}'{who_str}."
+    except Exception as exc:
+        logger.error("complete_task failed: %s", exc)
+        return "Something went wrong. Please try again."
+
+
+@mcp.tool()
+def list_upcoming_tasks(days: int = 30, member_name: str = "") -> str:
     """List tasks that are not done and are due within the next N days (default 30),
-    soonest first. Overdue tasks are included. Use when the user asks what is coming up or what is pending."""
+    soonest first. Optional member_name filters tasks for a specific person.
+    Overdue tasks are included. Use when the user asks what is coming up or what is pending."""
     if not 0 <= days <= 3650:
         return "Please give a number of days between 0 and 3650."
 
@@ -187,22 +363,38 @@ def list_upcoming_tasks(days: int = 30) -> str:
 
     try:
         conn = db.get_connection()
-        rows = conn.execute(
+        db.align_demo_dates(conn)
+        query = (
             "SELECT t.title, t.due_date, m.name "
             "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
             "WHERE t.done = 0 AND t.due_date <= ? "
-            "ORDER BY t.due_date",
-            (cutoff.isoformat(),),
-        ).fetchall()
+        )
+        params = [cutoff.isoformat()]
+        if member_name and member_name.strip():
+            query += "AND LOWER(m.name) = LOWER(?) "
+            params.append(member_name.strip())
+
+        query += "ORDER BY t.due_date"
+        rows = conn.execute(query, tuple(params)).fetchall()
     except Exception as exc:
         logger.error("list_upcoming_tasks failed: %s", exc)
         return "Something went wrong. Please try again."
 
+    who = f" for {member_name.strip()}" if member_name and member_name.strip() else ""
     if not rows:
-        return f"No tasks due in the next {days} days."
+        return f"No tasks due in the next {days} days{who}."
+
+    # Deduplicate redundant tasks by (title, name)
+    seen = set()
+    unique_rows = []
+    for r in rows:
+        key = (r["title"].strip().lower(), (r["name"] or "").strip().lower())
+        if key not in seen:
+            seen.add(key)
+            unique_rows.append(r)
 
     lines = []
-    for r in rows:
+    for r in unique_rows:
         due = datetime.date.fromisoformat(r["due_date"])
         left = (due - today).days
         if left < 0:
@@ -211,16 +403,17 @@ def list_upcoming_tasks(days: int = 30) -> str:
             status = "due today"
         else:
             status = f"{left} days left"
-        who = f" ({r['name']})" if r["name"] else ""
+        who = f" ({r['name']})" if r["name"] and r["name"].lower() not in r["title"].lower() else ""
         lines.append(f"{r['title']}{who} - {r['due_date']} ({status})")
 
     return "\n".join(lines)
 
 
 @mcp.tool()
-def check_scheme_eligibility(name: str, tags: str = "") -> str:
+def check_scheme_eligibility(name: str, tags: str = "", country: str = "") -> str:
     """Check government scheme eligibility for a family member by name.
-    Optional tags can be provided as comma-separated labels (e.g. 'bpl', 'income_tax_payer')."""
+    Optional tags can be provided as comma-separated labels (e.g. 'bpl', 'low_income', 'employed', 'income_tax_payer').
+    Optional country can be 'IN' (India), 'US' (United States), or 'all' (default)."""
     name = name.strip()
     if not name:
         return "Please provide a family member's name."
@@ -234,8 +427,9 @@ def check_scheme_eligibility(name: str, tags: str = "") -> str:
             return f"I don't know anyone called {name}. Add them first."
 
         parsed_tags = {t.strip().lower() for t in tags.split(",") if t.strip()}
+        target_country = country.strip() if country else "all"
         results = schemes.check_eligibility(
-            member["birth_year"], parsed_tags, member_name=member["name"]
+            member["birth_year"], parsed_tags, member_name=member["name"], country=target_country
         )
     except Exception as exc:
         logger.error("check_scheme_eligibility failed: %s", exc)
@@ -361,14 +555,21 @@ def plan_scheme_application(name: str, scheme: str, days_to_prepare: int = 7) ->
         task1_title = f"Gather docs for {matched['name']}"
         task2_title = f"Submit application for {matched['name']}"
 
-        conn.execute(
-            "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
-            (task1_title, gather_due.isoformat(), member["id"]),
-        )
-        conn.execute(
-            "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
-            (task2_title, apply_due.isoformat(), member["id"]),
-        )
+        for t_title, t_due in [(task1_title, gather_due), (task2_title, apply_due)]:
+            existing = conn.execute(
+                "SELECT id FROM tasks WHERE title = ? AND member_id = ? AND done = 0",
+                (t_title, member["id"]),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE tasks SET due_date = ? WHERE id = ?",
+                    (t_due.isoformat(), existing["id"]),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
+                    (t_title, t_due.isoformat(), member["id"]),
+                )
         conn.commit()
     except Exception as exc:
         logger.error("plan_scheme_application failed: %s", exc)
@@ -400,6 +601,12 @@ def family_brief(member_name: str = "") -> str:
     today = datetime.date.today()
     cutoff_docs = today + datetime.timedelta(days=30)
     cutoff_tasks = today + datetime.timedelta(days=14)
+
+    try:
+        conn_init = db.get_connection()
+        db.align_demo_dates(conn_init)
+    except Exception:
+        pass
 
     target = member_name.strip()
     if target and target.lower() not in ("all", "everyone", "family"):
@@ -674,14 +881,24 @@ def orchestrate_life_event(member_name: str, event_type: str, notes: str = "") -
                 (new_status, member["id"]),
             )
 
-        # 2. Insert scheduled roadmap tasks into SQLite
+        # 2. Insert scheduled roadmap tasks into SQLite (deduplicated / idempotent)
         scheduled_tasks = []
         for task_title, days_offset in phases:
             due_dt = today + datetime.timedelta(days=days_offset)
-            conn.execute(
-                "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
-                (task_title, due_dt.isoformat(), member["id"]),
-            )
+            existing = conn.execute(
+                "SELECT id FROM tasks WHERE title = ? AND member_id = ? AND done = 0",
+                (task_title, member["id"]),
+            ).fetchone()
+            if existing:
+                conn.execute(
+                    "UPDATE tasks SET due_date = ? WHERE id = ?",
+                    (due_dt.isoformat(), existing["id"]),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
+                    (task_title, due_dt.isoformat(), member["id"]),
+                )
             scheduled_tasks.append((task_title, due_dt.isoformat(), days_offset))
 
         conn.commit()
@@ -1192,6 +1409,27 @@ def simulate_bureaucratic_conflicts(member_name: str = "", target_schemes: str =
             )
             protected_value_inr += 6000
 
+        # -------------------------------------------------------------
+        # Rule 6: US Medicare Part A vs. Health Savings Account (HSA) Collision
+        # -------------------------------------------------------------
+        for m in analyzed_members:
+            age = today.year - m["birth_year"]
+            if age >= 65 and (not filter_ids or "us_medicare" in filter_ids):
+                has_hsa = "hsa" in m["status"].lower() or member_has_doc(m["id"], "hsa") or member_has_doc(m["id"], "health savings account")
+                if has_hsa:
+                    conflicts.append({
+                        "severity": "STATUTORY TAX PENALTY COLLISION",
+                        "type": "IRS Medicare-HSA Contribution Bar",
+                        "parties": f"{m['name']} (Age {age})",
+                        "schemes": "Medicare (Parts A & B) vs. Health Savings Account (HSA)",
+                        "clause": "IRS IRC § 223(c)(1) / Publication 969: Enrolling in any Medicare Part (including automatic retroactive Part A) disqualifies individuals from contributing to an HSA, incurring a 6% excise penalty on excess contributions.",
+                        "risk": "IRS 6% excise tax penalty and retroactive disqualification of tax-free contributions."
+                    })
+                    restructuring_steps.append(
+                        f"Action for {m['name']}: Cease all payroll and personal HSA contributions at least 6 months prior to Medicare Part A application to account for statutory retroactive coverage."
+                    )
+                    protected_value_inr += 200000
+
         # Formatting Output Report
         total_conflicts = len(conflicts)
         status_banner = "🚨 CRITICAL SCRUTINY HAZARDS DETECTED" if total_conflicts > 0 else "✅ CLEAN SCRUTINY PATH (0 CONFLICTS)"
@@ -1648,6 +1886,7 @@ def get_family_dashboard() -> str:
 
     try:
         conn = db.get_connection()
+        db.align_demo_dates(conn)
         members = conn.execute(
             "SELECT id, name, relation, birth_year, status FROM family_members ORDER BY name"
         ).fetchall()
@@ -1661,12 +1900,21 @@ def get_family_dashboard() -> str:
             "ORDER BY d.expiry_date"
         ).fetchall()
 
-        tasks = conn.execute(
+        raw_tasks = conn.execute(
             "SELECT t.id, t.title, t.due_date, t.done, m.name "
             "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
             "WHERE t.done = 0 "
             "ORDER BY t.due_date"
         ).fetchall()
+
+        # Deduplicate redundant tasks by (title, member_name)
+        tasks = []
+        seen_t = set()
+        for t in raw_tasks:
+            t_key = (t["title"].strip().lower(), (t["name"] or "").strip().lower())
+            if t_key not in seen_t:
+                seen_t.add(t_key)
+                tasks.append(t)
 
         # Compile metrics
         total_members = len(members)
@@ -1709,7 +1957,7 @@ def get_family_dashboard() -> str:
                 due = datetime.date.fromisoformat(t["due_date"])
                 diff = (due - today).days
                 tag = f"OVERDUE by {-diff}d" if diff < 0 else ("Due today" if diff == 0 else f"{diff}d left")
-                owner_info = f" ({t['name']})" if t['name'] else " (Household)"
+                owner_info = f" ({t['name']})" if t['name'] and t['name'].lower() not in t['title'].lower() else ""
                 lines.append(f"• {t['title']}{owner_info} — due {t['due_date']} [{tag}]")
 
         if scheme_matches:

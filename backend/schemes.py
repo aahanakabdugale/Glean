@@ -6,9 +6,12 @@ SCHEMES_PATH = Path(__file__).parent.parent / "data" / "schemes.json"
 ALMOST_ELIGIBLE_WINDOW_YEARS = 3
 
 
-def load_schemes() -> list[dict]:
+def load_schemes(country: str | None = None) -> list[dict]:
     with open(SCHEMES_PATH, encoding="utf-8") as f:
-        return json.load(f)
+        data = json.load(f)
+    if country and country.strip().lower() != "all":
+        return [s for s in data if s.get("country", "IN").lower() == country.strip().lower()]
+    return data
 
 
 def age_from_birth_year(birth_year: int, today: date | None = None) -> int:
@@ -22,17 +25,19 @@ def check_eligibility(
     tags: set[str] | None = None,
     today: date | None = None,
     member_name: str = "",
+    country: str = "all",
 ) -> list[dict]:
-    """Match one person against every scheme.
+    """Match one person against government schemes.
 
-    tags: facts we know are true, e.g. {"bpl"} or {"income_tax_payer"}.
+    country: 'IN', 'US', or 'all' (default).
+    tags: facts we know are true, e.g. {"bpl"}, {"low_income"}, {"income_tax_payer"}.
     status is one of: may_be_eligible, check_needed, almost_eligible, not_eligible.
     """
     tags = tags or set()
     age = age_from_birth_year(birth_year, today)
     results = []
 
-    for s in load_schemes():
+    for s in load_schemes(country=country):
         rules = s.get("rules", {})
         reasons, confirm = [], []
         status = None
@@ -76,6 +81,8 @@ def check_eligibility(
         res_dict = {
             "scheme_id": s["id"],
             "name": s["name"],
+            "country": s.get("country", "IN"),
+            "state": s.get("state", "All India"),
             "status": status,
             "reasons": reasons,
             "confirm": confirm,

@@ -23,6 +23,7 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
     if conn is None:
         conn = db.get_connection()
 
+    db.align_demo_dates(conn)
     today = datetime.date.today()
     alerts: list[dict] = []
 
