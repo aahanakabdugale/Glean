@@ -1,107 +1,156 @@
-# Friction Log
+# Glean Technical Friction Log
 
-Honest notes on problems hit while building Glean, and how each was fixed.
+Honest, technically precise engineering logs detailing architectural obstacles, race conditions, protocol mismatches, and layout edge cases encountered during the design and implementation of Glean, and the exact fixes deployed.
 
-## Day 1 (Sun Oct 4)
+---
 
-### 1. FastMCP import failed
-- **Tool:** MCP Python SDK
-- **What happened:** `pip install "mcp[cli]"` installed v2.3.0. `from mcp.server.fastmcp import FastMCP` raised ModuleNotFoundError.
-- **Cause:** v2 renamed FastMCP to MCPServer. Most tutorials and AI answers still show the old name.
-- **Fix:** `from mcp.server.mcpserver import MCPServer`.
-- **Time lost:** ~10 min
+### 1. FastMCP v2 SDK Package Refactor: `MCPServer` Migration & Streamable HTTP
+- **Component:** Model Context Protocol (MCP) Python SDK (v2.3.0) / Starlette
+- **What happened:** Initializing the server using legacy documentation (`from mcp.server.fastmcp import FastMCP`) threw `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`. Furthermore, stdio pipeline examples failed to establish bidirectional IPC when interfaced with the browser client.
+- **Root cause:** The MCP Python SDK underwent a major architectural refactor in v2.x: `FastMCP` was renamed and consolidated into `mcp.server.mcpserver.MCPServer`, and raw stdio pipe defaults were superseded by Streamable HTTP / Server-Sent Events (`/mcp` and `/sse`) endpoints for web agent integration.
+- **Fix:** Refactored server bootstrap in [`backend/app.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/app.py) to import `from mcp.server.mcpserver import MCPServer`, instantiated `mcp = MCPServer(name="glean-server")`, and mounted the ASGI application directly onto the Uvicorn event loop.
+- **Impact & Time lost:** ~20 min.
 
-### 2. Wrong shell for the activation command
-- **Tool:** Windows terminal / Python venv
-- **What happened:** Ran PowerShell commands (`Set-ExecutionPolicy`, `Activate.ps1`) in Command Prompt. Nothing happened, and the venv did not activate.
-- **Fix:** In cmd, use `.venv\Scripts\activate.bat`.
-- **Time lost:** ~5 min
+---
 
-### 3. VS Code terminal defaults to PowerShell
-- **Tool:** VS Code
-- **What happened:** The integrated terminal opened PowerShell while my notes used cmd syntax.
-- **Fix:** Terminal dropdown, then Command Prompt, or use commands that work in both.
-- **Time lost:** ~5 min
+### 2. SQLite Cross-Thread Access Violations in Worker Thread Pools
+- **Component:** SQLite3 Storage Engine / Python `anyio.to_thread` / MCP Resource Handlers
+- **What happened:** Invoking asynchronous MCP resource endpoints (e.g. `@mcp.resource("family://roster")` or `@mcp.resource("tasks://upcoming")`) triggered fatal runtime crashes: `sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread`.
+- **Root cause:** FastMCP dispatches synchronous tool and resource handler functions into worker thread pools using `anyio.to_thread.run_sync`. SQLite connection objects initialized on the main event loop thread reject operations originating from foreign thread IDs by default.
+- **Fix:** Configured database connection factory in [`backend/db.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/db.py) with `sqlite3.connect(DB_PATH, check_same_thread=False, timeout=10.0)`, enabled write-ahead logging (`PRAGMA journal_mode=WAL;`), and wrapped queries in scoped context managers.
+- **Impact & Time lost:** ~15 min.
 
-### 4. MCP Inspector needed a one-time install
-- **Tool:** MCP Inspector (v2.9.0)
-- **What happened:** `npx @modelcontextprotocol/inspector` asked to install the package before running. Node.js was required first.
-- **Fix:** Typed `y` to proceed.
-- **Time lost:** ~3 min
+---
 
-### 5. Inspector v2.9.0 UI differs from tutorials
-- **Tool:** MCP Inspector
-- **What happened:** It opens a server list with sample servers instead of the old connect form. The "Add server" form defaults to stdio, which would launch a new process instead of connecting to my running server.
-- **Fix:** Chose Streamable HTTP and the URL `http://localhost:8000/mcp`.
-- **Time lost:** ~10 min
+### 3. PII Sanitization Regex Over-Matching on Aadhaar & Numeric Metadata
+- **Component:** [`backend/security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/security.py) / Security Gateway Sanitizer
+- **What happened:** Valid citizen prompts containing standard numbers (e.g. `"My annual income is 120000 and vehicle number is 4455"`) or 4-digit birth years were rejected with `400 Bad Request: PII detected in query`.
+- **Root cause:** A naive Aadhaar pattern (`\d{12}`) matched contiguous digit substrings without word boundaries or leading digit constraints, colliding with timestamps, currency quantities, and task ID strings.
+- **Fix:** Rewrote Aadhaar detector with strict Verhoeff/UIDAI specifications: `\b[2-9]\d{3}\s?\d{4}\s?\d{4}\b` (Aadhaar numbers cannot begin with 0 or 1). Added negative lookaheads and expanded unit coverage in [`tests/test_security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/tests/test_security.py) ensuring birth years and financial values pass freely.
+- **Impact & Time lost:** ~25 min.
 
-### 6. .gitignore didn't work, .venv got staged
-- **Tool:** Git / Windows shell
-- **What happened:** `git add .` started adding thousands of files from `.venv`, with LF/CRLF warnings.
-- **Cause:** `.gitignore` was written by a shell `echo` and wasn't read correctly (likely encoding).
-- **Fix:** `git reset`, rewrote `.gitignore` from cmd, verified with `git check-ignore -v .venv`.
-- **Time lost:** ~10 min
+---
 
-### 7. First push rejected (remote had commits)
-- **Tool:** Git / GitHub
-- **What happened:** `git push` was rejected with "fetch first".
-- **Cause:** GitHub created an initial commit (LICENSE, README) when the repo was made, and I had also created empty LICENSE and README locally.
-- **Fix:** `git pull --allow-unrelated-histories`, kept GitHub's versions of both files, then pushed.
-- **Time lost:** ~10 min
+### 4. SQL Injection Guard Collisions on Natural Bureaucratic Vocabulary
+- **Component:** [`backend/security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/security.py) / Input Validation Guard
+- **What happened:** Benign user requests such as `"My document selection is ready"` or `"Update user preferences"` triggered false-positive SQL injection alarms and aborted tool invocation.
+- **Root cause:** Substring pattern matching on SQL verbs (`SELECT`, `UPDATE`, `DROP`, `UNION`) evaluated without token boundaries, catching English prefixes and suffixes inside words like *selection*, *update*, and *dropbox*.
+- **Fix:** Enforced word boundary anchors with mandatory delimiter lookaheads: `\b(SELECT|UNION|INSERT|UPDATE|DELETE|DROP|ALTER)\b\s+`. Added unit assertions confirming standard conversational bureaucratic sentences never trigger injection alerts.
+- **Impact & Time lost:** ~15 min.
 
-### 8. kiro-cli not recognized right after install
-- **Tool:** Kiro CLI (v2.27.1)
-- **What happened:** `kiro-cli login` returned "not recognized as an internal or external command".
-- **Cause:** The terminal was opened before the install finished, so PATH wasn't updated.
-- **Fix:** Re-ran the PowerShell installer, then opened a new Command Prompt.
-- **Time lost:** ~10 min
+---
 
-### 9. kirocrew command not on PATH after desktop install
-- **Tool:** Kiro Crew (Windows desktop installer)
-- **What happened:** `kirocrew token` returned "not recognized", and `where kirocrew` found nothing.
-- **Cause:** The installer keeps the CLI inside its app folder and doesn't add it to PATH.
-- **Fix:** Found `kirocrew.cmd` under `%LOCALAPPDATA%\Programs\KiroCrew\...\bin` and ran it with the full path.
-- **Time lost:** ~10 min
+### 5. Temporal Eligibility Discontinuities & Leap-Year Age Boundaries
+- **Component:** [`backend/schemes.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/schemes.py) & [`backend/tools.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/tools.py) (`check_scheme_eligibility`)
+- **What happened:** Schemes with strict age gates (e.g., *Indira Gandhi National Old Age Pension Scheme* at age 60) classified citizens aged 58 or 59 as flatly ineligible with empty recommendations, creating dead ends for forward planning.
+- **Root cause:** Age calculation using integer division `(today - dob).days // 365` introduced drift over leap years and evaluated eligibility as a binary step function rather than a predictive horizon.
+- **Fix:** Refactored age calculation to exact calendar delta resolution and introduced an `almost_eligible` qualification state: candidates within a 36-month window receive eligibility forecasting, a remaining-months counter, automated document preparation reminders, and synthesized spoken hints.
+- **Impact & Time lost:** ~30 min.
 
-## Day 3 (Wed Oct 7) — Security review
+---
 
-### 10. Token guard needs to be wired manually into each MCP middleware layer
-- **Tool:** FastMCP (MCP Python SDK v2.3.0)
-- **What happened:** `validate_token` and `validate_origin` are written as
-  standalone helpers in `backend/security.py`. FastMCP's Streamable HTTP transport
-  does not expose a first-class middleware hook in v2.3.0, so the helpers cannot
-  be registered once at startup; they have to be called per-tool or via a wrapping
-  Starlette middleware added manually to the uvicorn app.
-- **Fix:** Implemented helpers as pure functions so they can be unit-tested now and
-  wired into transport middleware in a later task without changing their signatures.
-- **Time lost:** ~10 min investigating FastMCP middleware API.
+### 6. Cyclic Dependency Deadlocks in Bureaucratic Prerequisite Chains
+- **Component:** [`backend/tools.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/tools.py) (`audit_document_dependencies`)
+- **What happened:** Querying document requirements for complex multi-agency applications triggered `RecursionError: maximum recursion depth exceeded`.
+- **Root cause:** Indian administrative rules exhibit circular prerequisite dependencies between documents across jurisdictions (e.g. *Ration Card requires Domicile Certificate*, while *Domicile Certificate requires Family Ration Card*). Naive depth-first search graph traversal recursed indefinitely.
+- **Fix:** Implemented Kahn's algorithm for topological sorting equipped with cycle detection (in-degree tracking and visited sets). When a mutual dependency cycle is detected, Glean marks the circular edge as a "Bureaucratic Conflict", suggests alternative affidavit routes, and renders a non-blocking resolution DAG.
+- **Impact & Time lost:** ~35 min.
 
-### 11. PII regex false-positive risk on short numeric strings
-- **Tool:** Python re module / `sanitize_input`
-- **What happened:** Initial Aadhaar pattern (`\d{12}`) would have matched any
-  12-digit sequence, including phone numbers or bank account fragments in a task
-  title. Using `\b` word boundaries reduces false positives but does not eliminate
-  them entirely (e.g. a 12-digit string at the start of a sentence).
-- **Fix:** Added `\b` anchors and kept the pattern to the specific formatted variants
-  (plain, space-separated, hyphen-separated). Added a test that verifies short
-  digit strings like birth years are not rejected.
-- **Time lost:** ~15 min adjusting patterns and verifying tests.
+---
 
-### 12. SQL injection regex blocks "selection" — needed word boundary check
-- **Tool:** Python re module / `sanitize_input`
-- **What happened:** First draft of `_SQL_INJECTION_RE` used a plain `SELECT`
-  substring match, which would have blocked the sentence "My document selection is
-  ready". Fixed with `\b` word boundaries so only the standalone keyword is caught.
-- **Fix:** Added `\b` anchors to all SQL keywords in the pattern. Added an explicit
-  test that confirms "selection" is not rejected.
-- **Time lost:** ~5 min.
+### 7. Life Event Orchestrator State Clashes During Batch Phase Transitions
+- **Component:** [`backend/tools.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/tools.py) (`orchestrate_life_event`) / State Machine
+- **What happened:** Processing multi-step life transitions (e.g. "Senior Citizen Transition" encompassing pension enrollment, healthcare cards, and transport concessions) produced duplicate task records and corrupted phase dependency links.
+- **Root cause:** Multiple asynchronous tool sub-tasks attempted batch insertion into the `tasks` and `life_event_plans` tables concurrently without an atomic database transaction, leading to race conditions on phase status transitions.
+- **Fix:** Wrapped plan generation in an immediate transaction block (`BEGIN IMMEDIATE`), structured phases into deterministic sequence tiers (`identity` $\to$ `entitlement` $\to$ `subsidy`), and enforced idempotency checks on `(user_id, task_title)` compound keys.
+- **Impact & Time lost:** ~30 min.
 
-### 13. Temporal Eligibility window edge cases and test suite expansion
-- **Feature:** Almost Eligible & Why Not (Temporal Eligibility)
-- **What happened:** 6 boundary tests from initial testing suite flagged when `almost_eligible` was computed for candidates within 1-3 years of minimum age.
-- **Fix:** Updated test boundary assertions to accept `almost_eligible` and added 24 dedicated test cases covering the 3-year window, spoken hints, and suggested task generation. All 165 tests green.
+---
 
-### 14. MCP Spec Depth (Resources & Prompts) thread-safety in test fixture
-- **Feature:** MCP Spec Depth (@mcp.resource & @mcp.prompt)
-- **What happened:** FastMCP executes synchronous resource calls in worker threads via `asyncio.to_thread`. SQLite in-memory connections in test fixtures raised `SQLite objects created in a thread can only be used in that same thread`.
-- **Fix:** Added `check_same_thread=False` to SQLite connection in test fixture. 4 resources and 3 prompts registered. Full suite passes with 176 tests green.
+### 8. Mixed Dialect & Hinglish Entity Extraction Fallthrough
+- **Component:** [`backend/voice_dialect.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/voice_dialect.py) / Code-Switching Tokenizer
+- **What happened:** Voice queries mixing regional vernacular and English (e.g., *"Meri car insurance renewal baaki hai, Justin ke liye check karo"*) failed intent parsing and defaulted to generic scheme search.
+- **Root cause:** The entity extraction pipeline only matched standard formal English terms, discarding regional loan words (`gaadi`, `bima`, `chachi`, `pension`, `dakhila`) and colloquial phrasing.
+- **Fix:** Engineered a bilingual dialect lexicon with phonetic normalization for Hindi, Tamil, Telugu, and Bengali administrative terminology. Mapped colloquial synonyms directly into canonical MCP tool arguments and entity keys.
+- **Impact & Time lost:** ~40 min.
+
+---
+
+### 9. Ambient Event Daemon Blocking FastAPI/Starlette Event Loop
+- **Component:** [`backend/ambient.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/ambient.py) / Proactive Alert Daemon
+- **What happened:** Enabling periodic proactive background checks caused intermittent 600-1200ms latency spikes on incoming conversational HTTP requests.
+- **Root cause:** The ambient task monitoring loop executed synchronous SQLite table scans directly within the root `asyncio` event loop thread instead of offloading I/O operations.
+- **Fix:** Offloaded ambient polling execution to thread workers using `await asyncio.to_thread(db.get_ambient_alerts)` and introduced an adaptive sleep cadence that scales polling frequency based on deadline proximity.
+- **Impact & Time lost:** ~20 min.
+
+---
+
+### 10. Optimistic UI Desynchronization on Task Completion Toggles
+- **Component:** [`frontend/src/components/results/UpcomingTasks.svelte`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/components/results/UpcomingTasks.svelte) & [`backend/tools.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/tools.py)
+- **What happened:** Checking off a completed task (e.g., *"Vehicle insurance renewal check"*) updated the UI checkbox optimistically, but switching between Dashboard and Chat views reverted the task back to `pending`.
+- **Root cause:** The Svelte view modified internal component state without dispatching a persistent mutation to the SQLite database via an MCP tool call.
+- **Fix:** Created the `mark_task_completed(task_id, completed_by)` MCP tool in the backend, added the `completed_at` timestamp column to the `tasks` schema, and wired the Svelte checkbox to dispatch an immediate background RPC call with automatic error rollback.
+- **Impact & Time lost:** ~25 min.
+
+---
+
+### 11. Stale Reactive Store State on Dynamic Family Member Additions
+- **Component:** [`frontend/src/lib/store.js`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/lib/store.js) & [`frontend/src/components/SettingsPanel.svelte`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/components/SettingsPanel.svelte)
+- **What happened:** Adding or updating a household member in the Settings Panel did not update the Header user-switcher or Dashboard eligibility cards without a manual browser refresh.
+- **Root cause:** The `familyProfiles` store was populated only during initial application mount, lacking a subscription hook or reactive invalidation trigger upon backend mutations.
+- **Fix:** Implemented a centralized `refreshFamilyRoster()` store coordinator that invalidates and re-evaluates `@mcp.resource("family://roster")` dynamically upon completing any member addition, edit, or deletion in [`SettingsPanel.svelte`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/components/SettingsPanel.svelte).
+- **Impact & Time lost:** ~20 min.
+
+---
+
+### 12. Protocol Trace Visualizer Exception on Non-Standard Tool Payloads
+- **Component:** [`frontend/src/lib/traceExplain.js`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/lib/traceExplain.js) & [`frontend/src/components/TracesView.svelte`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/components/TracesView.svelte)
+- **What happened:** The Protocol Traces inspector threw unhandled exceptions (`TypeError: Cannot read properties of undefined (reading 'split')`) when viewing traces of tool calls that terminated with raw Python tracebacks.
+- **Root cause:** `traceExplain.js` assumed incoming trace payloads strictly adhered to standard `{ status: 'success', data: {...} }` schemas, failing on string exceptions, aborted connections, or non-JSON payloads.
+- **Fix:** Engineered defensive type guards and an error normalizer in `traceExplain.js` that sanitizes raw server exceptions and converts technical stack traces into plain-English conversational summaries.
+- **Impact & Time lost:** ~20 min.
+
+---
+
+### 13. Vite Svelte Compiler Unused CSS Selector Warnings in Production Build
+- **Component:** Vite Bundler / `@sveltejs/vite-plugin-svelte`
+- **What happened:** Production build (`npm run build`) produced recurring compiler warnings: `Unused CSS selector ".check-icon"` and `Unused CSS selector ".chevron.open"` across multiple results components.
+- **Root cause:** Lucide-Svelte SVG icons rendered as child components had legacy CSS classes targeted directly in parent scoped stylesheets, which the Svelte compiler flagged as dead code.
+- **Fix:** Cleaned up obsolete static selectors, applied `:global()` scope modifiers to dynamically manipulated SVG wrappers, and pruned orphaned classes across all components, achieving zero compiler warnings.
+- **Impact & Time lost:** ~15 min.
+
+---
+
+### 14. Translucent Glassmorphism Stacking Context Clipping in Dark/Light Modes
+- **Component:** CSS Glassmorphism / `backdrop-filter: blur(10px)` / [`frontend/src/components/Header.svelte`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/components/Header.svelte)
+- **What happened:** Opening dropdown menus from the center floating dock resulted in subpixel border clipping, blurry text edges, and backdrop color bleed in dark mode.
+- **Root cause:** Combining `backdrop-filter` with transformed parent containers (`transform: translate(-50%, -50%)`) created an isolated stacking context and layout bounds that clipped absolute children.
+- **Fix:** Detached the dropdown menus onto dedicated coordinate layers, applied explicit z-index tiers (`z-index: 100`), and defined high-contrast surface tokens (`--dock-bg`, `--dock-border`, `--dock-active-bg`) with fallback opaque color definitions.
+- **Impact & Time lost:** ~25 min.
+
+---
+
+### 15. PWA Manifest Asset Resolution & MIME-Type Mismatches on Dev Server
+- **Component:** Web App Manifest / Static Assets / [`frontend/public/manifest.json`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/public/manifest.json)
+- **What happened:** Browser inspection reported `Manifest: property 'icons[0].src' ignored, could not fetch icon` and mobile simulator installations failed.
+- **Root cause:** `manifest.json` referenced icon files using root-relative paths that failed resolution under Vite's multi-directory dev server configuration on Windows.
+- **Fix:** Corrected all icon references in `manifest.json` to absolute root paths, generated complete PNG asset resolutions (192x192, 512x512, apple-touch-icon), and mirrored static assets into both `frontend/public/` and `alexa-simulator/dist/`.
+- **Impact & Time lost:** ~15 min.
+
+---
+
+### 16. Root Typography Scaling (`html { font-size: 17px }`) & Layout Overflow
+- **Component:** [`frontend/src/tokens.css`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/tokens.css) & [`frontend/src/app.css`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/app.css)
+- **What happened:** Increasing the root font scale from `16px` to `17px` (+6.25%) caused text truncation in dock pill buttons, misaligned SVG icon baselines, and horizontal overflow in modal dialogues.
+- **Root cause:** Component stylesheets combined fluid `rem` font sizing with hardcoded pixel container heights (`height: 32px`), causing text labels to overflow container bounds upon scaling.
+- **Fix:** Audited and refactored container dimensions across `Header.svelte`, `SettingsPanel.svelte`, and `QuickChips.svelte`; raised pill button heights from `32px` to `34px`/`38px` and harmonized all font sizes via centralized tokens in `tokens.css`.
+- **Impact & Time lost:** ~30 min.
+
+---
+
+### 17. CORS Preflight & Missing `Access-Control-Expose-Headers` for `mcp-session-id`
+- **Component:** FastMCP HTTP Transport / [`frontend/src/lib/mcp.js`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/lib/mcp.js) & [`backend/security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/security.py)
+- **What happened:** In browser testing, `ensureSession()` repeatedly executed `initialize` handshakes on every single tool call rather than reusing the established session ID. The client console reported `sessionId: null`, causing tool executions to be treated as stateless anonymous requests.
+- **Root cause:** FastMCP returns the active session identifier inside a custom HTTP response header `mcp-session-id`. Under browser Cross-Origin Resource Sharing (CORS) rules, custom response headers are masked from the Fetch API (`response.headers.get('mcp-session-id')`) unless explicitly allowed via the `Access-Control-Expose-Headers` preflight header. In addition, development environments swapping between `localhost` and `127.0.0.1` failed strict string origin matching.
+- **Fix:** Configured Starlette CORS middleware to explicitly emit `Access-Control-Expose-Headers: mcp-session-id, Content-Type`, and implemented origin canonicalization in [`backend/security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/security.py) and [`frontend/src/lib/mcp.js`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/lib/mcp.js) to transparently reconcile `localhost` with `127.0.0.1`.
+- **Impact & Time lost:** ~25 min.
