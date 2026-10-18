@@ -1,12 +1,19 @@
 <script>
   import { urgencyOf, formatDaysLeft } from '../../lib/urgency.js';
   import { CalendarCheck, Check, AlertCircle, Clock } from '@lucide/svelte';
+  import { callCompleteTask } from '../../lib/mcp.js';
 
   export let data = [];
   let checked = {};
 
-  function toggle(i) {
-    checked = { ...checked, [i]: !checked[i] };
+  async function toggle(i, task) {
+    if (checked[i]) return;
+    checked = { ...checked, [i]: true };
+    try {
+      await callCompleteTask(task.title, task.member || '');
+    } catch (e) {
+      console.error('Failed to complete task', e);
+    }
   }
 </script>
 
@@ -28,7 +35,7 @@
               type="button"
               class="check-circle"
               class:ticked={checked[i]}
-              on:click={() => toggle(i)}
+              on:click={() => toggle(i, task)}
               aria-label="{checked[i] ? 'Unmark' : 'Mark'} task: {task.title}"
               aria-pressed={checked[i]}
             >
@@ -41,21 +48,36 @@
               <span class="task-title text-body" class:done={checked[i]}>
                 <strong>{task.title}</strong>
               </span>
-              {#if task.member}
-                <span class="task-member text-small">{task.member}</span>
-              {/if}
+              <div class="task-meta text-small">
+                {#if task.dueDate}
+                  <span>Due {task.dueDate}</span>
+                {/if}
+                {#if task.dueDate && task.member}
+                  <span>·</span>
+                {/if}
+                {#if task.member}
+                  <span class="task-member">{task.member}</span>
+                {/if}
+              </div>
             </div>
           </div>
 
           <div class="task-right">
-            <span class="vr-badge {level}">
-              {#if task.overdue}
-                <AlertCircle size={12} />
-              {:else}
-                <Clock size={12} />
-              {/if}
-              <span>{task.statusText || formatDaysLeft(task.daysLeft)}</span>
-            </span>
+            {#if checked[i]}
+              <span class="vr-badge ok">
+                <Check size={12} />
+                <span>Done</span>
+              </span>
+            {:else}
+              <span class="vr-badge {level}">
+                {#if task.overdue}
+                  <AlertCircle size={12} />
+                {:else}
+                  <Clock size={12} />
+                {/if}
+                <span>{task.statusText || formatDaysLeft(task.daysLeft)}</span>
+              </span>
+            {/if}
           </div>
         </div>
       {/each}
@@ -135,6 +157,13 @@
   .task-title.done {
     text-decoration: line-through;
     color: var(--text-muted);
+  }
+
+  .task-meta {
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
 
   .task-member {

@@ -84,6 +84,29 @@
   --danger-border: rgba(180,35,42,.45);
   --focus: #2f5bea;
   --logo-glow: rgba(59,111,245,.25);
+
+  /* Floating Bottom Navigation Dock Tokens (Light) */
+  --dock-bg: rgba(255,255,255,0.8);
+  --dock-border: #d6e0f0;
+  --dock-text: #5b6b82;
+  --dock-active-bg: #e3edff;
+  --muted: #6b7a90;
+
+  /* Protocol Traces View Tokens (Light) */
+  --tr-page-bg: #f3f6fd;
+  --tr-panel: #ffffff;
+  --tr-card: #f1f5fd;
+  --tr-code-bg: #eef3fc;
+  --tr-border: #dbe4f5;
+  --tr-text: #1b2540;
+  --tr-muted: #66769a;
+  --tr-accent: #2563eb;
+  --tr-success: #0f7a4a;
+  --tr-success-bg: #dcf5e7;
+  --tr-warning: #b45309;
+  --tr-warning-bg: #fdf0d5;
+  --tr-danger: #b4232a;
+  --tr-danger-bg: rgba(180,35,42,.12);
 }
 
 [data-theme="dark"] {
@@ -165,6 +188,29 @@
   --danger-border: rgba(255,107,107,.50);
   --focus: #3a58a8;
   --logo-glow: rgba(59,111,245,.20);
+
+  /* Floating Bottom Navigation Dock Tokens (Dark) */
+  --dock-bg: rgba(15,26,43,0.8);
+  --dock-border: #24405f;
+  --dock-text: #8ea3bd;
+  --dock-active-bg: #0d3a4d;
+  --muted: #6a7f99;
+
+  /* Protocol Traces View Tokens (Dark) */
+  --tr-page-bg: #060a14;
+  --tr-panel: #0d1930;
+  --tr-card: #12223f;
+  --tr-code-bg: #0a1424;
+  --tr-border: #1f3354;
+  --tr-text: #e8eef9;
+  --tr-muted: #8497b8;
+  --tr-accent: #19c3ff;
+  --tr-success: #4ade80;
+  --tr-success-bg: rgba(74,222,128,.14);
+  --tr-warning: #fbbf24;
+  --tr-warning-bg: rgba(251,191,36,.14);
+  --tr-danger: #f87171;
+  --tr-danger-bg: rgba(248,113,113,.14);
 }
 
 /* ---------- SHARED SCALES (THEME-INDEPENDENT) ---------- */
@@ -181,22 +227,22 @@
   --font-mono: 'Roboto Mono', ui-monospace, monospace;
 
   /* Font sizes & line heights */
-  --fs-caption: 32px;
+  --fs-caption: 34px;
   --lh-caption: 1.25;
-  --fs-caption-m: 24px;
-  --fs-h1: 28px;
+  --fs-caption-m: 25px;
+  --fs-h1: 30px;
   --lh-h1: 1.2;
-  --fs-h2: 20px;
+  --fs-h2: 22px;
   --lh-h2: 1.3;
-  --fs-number: 28px;
+  --fs-number: 30px;
   --lh-number: 1.1;
-  --fs-body: 16px;
+  --fs-body: 17px;
   --lh-body: 1.5;
-  --fs-small: 14px;
+  --fs-small: 15px;
   --lh-small: 1.4;
-  --fs-label: 12px;
+  --fs-label: 13px;
   --lh-label: 1.3;
-  --fs-mono: 13px;
+  --fs-mono: 14px;
   --lh-mono: 1.5;
 
   /* Spacing Scale (4px base) */

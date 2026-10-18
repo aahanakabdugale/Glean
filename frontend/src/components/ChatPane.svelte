@@ -51,8 +51,8 @@
       </p>
       <ul class="empty-hints" aria-label="Example questions">
         <li><em>"What documents are expiring soon?"</em></li>
-        <li><em>"What schemes does Ramesh qualify for?"</em></li>
-        <li><em>"Plan the SCSS application for Suresh."</em></li>
+        <li><em>"What schemes does Chandler qualify for?"</em></li>
+        <li><em>"Check Medicare eligibility for Chandler."</em></li>
         <li><em>"Give me the family morning briefing."</em></li>
       </ul>
       <p class="empty-disclaimer">

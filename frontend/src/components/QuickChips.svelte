@@ -11,15 +11,18 @@
     : 'Chandler';
 
   $: primaryPills = [
-    { label: 'What is expiring soon?', prompt: 'What documents are expiring soon?' },
+    { label: 'What is expiring soon?', prompt: 'What documents are expiring in the next 60 days?' },
     { label: `Check schemes for ${elder}`, prompt: `What schemes does ${elder} qualify for?` },
   ];
 
   $: morePills = [
     { label: `Plan SCSS for ${elder}`, prompt: `Plan the SCSS application for ${elder}` },
+    { label: 'Check US Medicare for Chandler', prompt: 'Check US Medicare eligibility for Chandler' },
+    { label: 'Social Security for Chandler', prompt: 'Check Social Security retirement eligibility for Chandler' },
     { label: 'Morning briefing', prompt: $activePersona && $activePersona !== 'all' ? `Give me the morning briefing for ${$activePersona}` : 'Give me the full family briefing' },
     { label: 'Annual family review', prompt: 'Run the annual family review' },
     { label: 'Ayushman checklist', prompt: 'What documents are needed for Ayushman Vay Vandana?' },
+    { label: 'Medicare checklist', prompt: 'What documents are needed for Medicare?' },
     { label: 'Family roster', prompt: 'List all family members' },
     { label: 'Tasks in next 30 days', prompt: 'What tasks are coming up in the next 30 days?' },
     { label: 'Family dashboard', prompt: 'Show me the family dashboard' },

@@ -7,10 +7,10 @@
   import VoiceScreen   from './components/VoiceScreen.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import DashboardView from './components/DashboardView.svelte';
-  import TracePanel    from './components/TracePanel.svelte';
+  import TracesView    from './components/TracesView.svelte';
 
   import { onMount } from 'svelte';
-  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, familyMembersList, showTracePanel, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert, alexaMicEnabled } from './lib/store.js';
+  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, activeJurisdiction, familyMembersList, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert, alexaMicEnabled } from './lib/store.js';
   import * as mcp from './lib/mcp.js';
   import { cleanTextForSpeech } from './lib/speech.js';
 
@@ -158,29 +158,80 @@
         result.toolName = 'explain_for_generation';
         result.toolArgs = { scheme_id: scheme, target_persona: persona };
       } else if (q.includes('expir') || (q.includes('document') && (q.includes('soon') || q.includes('renew')))) {
-        result = await mcp.callGetExpiringDocuments(30);
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        const daysMatch = q.match(/(\d+)\s*days?/i);
+        const days = daysMatch ? parseInt(daysMatch[1], 10) : 60;
+        result = await mcp.callGetExpiringDocuments(days, person);
         result.toolName = 'get_expiring_documents';
-        result.toolArgs = { days: 30 };
+        result.toolArgs = person ? { days, member_name: person } : { days };
       } else if (q.includes('plan') || (q.includes('apply') && q.includes('for'))) {
-        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Suresh');
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Chandler');
         const scheme = extractScheme(q) || 'scss';
         result = await mcp.callPlanSchemeApplication(person, scheme, 7);
         result.toolName = 'plan_scheme_application';
         result.toolArgs = { name: person, scheme, days_to_prepare: 7 };
       } else if (q.includes('scheme') || q.includes('qualif') || q.includes('eligible') || q.includes('benefit') || q.includes('why') || q.includes('reason') || q.includes('reject')) {
         const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Justin');
-        result = await mcp.callCheckSchemeEligibility(person);
+        const country = q.includes('us') || q.includes('america') || q.includes('usa') ? 'US' : (q.includes('india') ? 'IN' : $activeJurisdiction);
+        result = await mcp.callCheckSchemeEligibility(person, '', country);
         result.toolName = 'check_scheme_eligibility';
-        result.toolArgs = { name: person };
+        result.toolArgs = { name: person, country };
       } else if (q.includes('checklist') || (q.includes('document') && q.includes('needed'))) {
         const scheme = extractScheme(q) || 'ayushman_vay_vandana';
         result = await mcp.callGetSchemeChecklist(scheme);
         result.toolName = 'get_scheme_checklist';
         result.toolArgs = { scheme };
+      } else if (
+        q.includes('complete') ||
+        q.includes('done with') ||
+        q.includes('finished') ||
+        q.includes('check off') ||
+        q.includes('checked off') ||
+        (q.includes('mark') && (q.includes('done') || q.includes('completed') || q.includes('finish')))
+      ) {
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        const taskTitle = extractTaskTitle(q);
+        result = await mcp.callCompleteTask(taskTitle, person);
+        result.toolName = 'complete_task';
+        result.toolArgs = { task_title: taskTitle, member_name: person };
       } else if (q.includes('task') || q.includes('deadline') || q.includes('upcoming')) {
-        result = await mcp.callListUpcomingTasks(30);
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        const daysMatch = q.match(/(\d+)\s*days?/i);
+        const days = daysMatch ? parseInt(daysMatch[1], 10) : 30;
+        result = await mcp.callListUpcomingTasks(days, person);
         result.toolName = 'list_upcoming_tasks';
-        result.toolArgs = { days: 30 };
+        result.toolArgs = person ? { days, member_name: person } : { days };
+      } else if (q.includes('add') && (q.includes('member') || q.includes('family') || q.includes('daughter') || q.includes('son') || q.includes('child'))) {
+        const yearMatch = q.match(/\b(19\d{2}|20\d{2})\b/);
+        const birthYear = yearMatch ? parseInt(yearMatch[1], 10) : 2005;
+        let relation = 'child';
+        if (q.includes('daughter')) relation = 'daughter';
+        else if (q.includes('son')) relation = 'son';
+        else if (q.includes('spouse') || q.includes('wife') || q.includes('husband')) relation = 'spouse';
+        else if (q.includes('mother') || q.includes('mom')) relation = 'mother';
+        else if (q.includes('father') || q.includes('dad')) relation = 'father';
+        else if (q.includes('grandmother') || q.includes('grandma')) relation = 'grandmother';
+        else if (q.includes('grandfather') || q.includes('grandpa')) relation = 'grandfather';
+
+        let status = 'student';
+        if (q.includes('retire')) status = 'retired';
+        else if (q.includes('work') || q.includes('employ')) status = 'employed';
+        else if (q.includes('baby') || q.includes('infant') || q.includes('toddler')) status = 'infant';
+
+        let nameMatch = q.match(/(?:named|called)\s+([a-zA-Z]+)/i) || q.match(/(?:member|daughter|son|add)\s+([a-zA-Z]+)/i);
+        let name = nameMatch ? nameMatch[1] : 'NewMember';
+        name = name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+
+        result = await mcp.callAddFamilyMember(name, relation, birthYear, status);
+        result.toolName = 'add_family_member';
+        result.toolArgs = { name, relation, birth_year: birthYear, status };
+
+        try {
+          const refreshed = await mcp.callListFamilyMembers();
+          if (refreshed && refreshed.resultData && Array.isArray(refreshed.resultData)) {
+            familyMembersList.set(refreshed.resultData);
+          }
+        } catch (_) {}
       } else if (q.includes('family') || q.includes('member') || q.includes('who') || q.includes('roster') || q.includes('rooster')) {
         result = await mcp.callListFamilyMembers();
         result.toolName = 'list_family_members';
@@ -231,7 +282,21 @@
       ?.replace(/^./, c => c.toUpperCase()) ?? null;
   }
 
+  function extractTaskTitle(q) {
+    let clean = q;
+    // Strip common phrases
+    clean = clean.replace(/^(i\s+have\s+|i\s+)?(completed|finished|did|done with|check off|checked off|mark as done|mark as completed|mark)\s+/i, '');
+    clean = clean.replace(/\s+(completed|finished|done|as done|as completed)\b/gi, '');
+    clean = clean.replace(/\b(for|belonging to)\s+(justin|chandler|amy|riley|jace|gwen|ramesh|suresh|sunita|maria)\b/gi, '');
+    clean = clean.replace(/\b(task|errand)\b/gi, '');
+    return clean.trim();
+  }
+
   function extractScheme(q) {
+    if (q.includes('medicare')) return 'us_medicare';
+    if (q.includes('social security') || q.includes('oasi') || q.includes('ssa')) return 'us_social_security';
+    if (q.includes('snap') || q.includes('food stamp') || q.includes('ebt')) return 'us_snap';
+    if (q.includes('401k') || q.includes('catch-up') || q.includes('catch up') || q.includes('secure 2.0')) return 'us_catchup_401k';
     if (q.includes('ayushman')) return 'ayushman_vay_vandana';
     if (q.includes('scss') || q.includes('saving')) return 'scss';
     if (q.includes('apy') || q.includes('atal')) return 'apy';
@@ -293,36 +358,32 @@
       <SettingsPanel />
     {:else if $activeView === 'dashboard'}
       <DashboardView onAction={(prompt) => { activeView.set('chat'); handleSend(prompt); }} />
+    {:else if $activeView === 'traces'}
+      <TracesView />
     {:else}
       <VoiceScreen onSend={handleSend} />
     {/if}
   </main>
-
-  <!-- Footer: small muted 12px text (hidden in settings view to keep 1-page fit) -->
-  {#if $activeView !== 'settings'}
-    <footer class="app-footer">
-      <p class="text-label footer-disclaimer">Glean gives guidance only. Verify on the official site.</p>
-    </footer>
-  {/if}
-
-  <!-- Live MCP Protocol Trace Drawer -->
-  {#if $showTracePanel}
-    <TracePanel />
-  {/if}
 </div>
 
 <style>
   .app-layout {
-    min-height: 100dvh;
+    height: 100dvh;
+    max-height: 100dvh;
     display: flex;
     flex-direction: column;
     width: 100%;
     margin: 0 auto;
+    overflow: hidden;
     transition: background-color var(--dur-base) var(--ease);
   }
 
-  .app-layout.settings-view {
+  .app-layout.settings-view,
+  .app-layout.data-view {
+    height: auto;
+    max-height: none;
     min-height: 100dvh;
+    overflow-y: auto;
   }
 
   .main-content {
@@ -330,31 +391,25 @@
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: flex-start;
     width: 100%;
-    max-width: 1400px;
     margin: 0 auto;
-    padding: var(--sp-24) var(--sp-24) 0 var(--sp-24);
+    padding: 0;
+    overflow: hidden;
+    min-height: 0;
   }
 
-  .settings-view .main-content {
-    justify-content: center;
-    padding: var(--sp-16) var(--sp-24);
+  .settings-view .main-content,
+  .data-view .main-content {
+    justify-content: flex-start;
+    max-width: 1400px;
+    padding: 76px var(--sp-24) var(--sp-24) var(--sp-24);
     min-height: 0;
+    overflow-y: visible;
   }
 
   .data-view .main-content {
     max-width: 1200px;
-  }
-
-  .app-footer {
-    text-align: center;
-    padding: var(--sp-12) var(--sp-16) var(--sp-16) var(--sp-16);
-    margin-top: var(--sp-16);
-  }
-
-  .footer-disclaimer {
-    color: var(--text-muted);
-    font-size: var(--fs-label);
   }
 
   /* Ambient Proactive Push Card (Bottom-Right Floating Square Box) */

@@ -26,6 +26,18 @@
   $: lastAssistantMsg = [...$messages].reverse().find(m => m.role === 'assistant');
   $: lastUserMsg = [...$messages].reverse().find(m => m.role === 'user');
 
+  function extractPersonFromQuery(q) {
+    if (!q) return null;
+    const l = q.toLowerCase();
+    if (l.includes('chandler') || l.includes('grandpa')) return 'Chandler';
+    if (l.includes('amy') || l.includes('grandma')) return 'Amy';
+    if (l.includes('justin') || l.includes('dad') || l.includes('father')) return 'Justin';
+    if (l.includes('riley') || l.includes('mom') || l.includes('mother')) return 'Riley';
+    if (l.includes('jace') || l.includes('son')) return 'Jace';
+    if (l.includes('gwen') || l.includes('daughter')) return 'Gwen';
+    return null;
+  }
+
   // Adapt general typed / spoken / quick-chip query results to Center Sheet structure
   function getGeneralSheetProps(assistantMsg, userMsg) {
     const query = userMsg?.text || 'Voice Query';
@@ -48,12 +60,20 @@
     }
 
     if (type === 'expiring_docs' && data) {
-      const count = data.expiringDocs?.length || 0;
+      const docsList = Array.isArray(data) ? data : (data.expiringDocs || data.docs || []);
+      const count = docsList.length;
+      const person = extractPersonFromQuery(query);
+      const daysMatch = query.match(/(\d+)\s*days?/i);
+      const days = daysMatch ? parseInt(daysMatch[1], 10) : 60;
+      const subject = person ? `documents for ${person}` : 'family documents';
+      const headline = count === 0
+        ? `No ${subject} expire within ${days} days.`
+        : `${count} ${subject} expire within ${days} days.`;
       return {
         query,
-        headline: `${count} family documents expire within 90 days.`,
-        accentWord: `${count} family documents`,
-        chips: [{ label: `${count} expiring soon`, color: 'amber' }]
+        headline,
+        accentWord: count === 0 ? `No ${subject}` : `${count} ${subject}`,
+        chips: [{ label: `${count} expiring soon`, color: count > 0 ? 'amber' : 'green' }]
       };
     }
 
@@ -86,12 +106,20 @@
     }
 
     if (type === 'upcoming_tasks' && data) {
-      const count = data.tasks?.length || 0;
+      const taskList = Array.isArray(data) ? data : (data.tasks || []);
+      const count = taskList.length;
+      const person = extractPersonFromQuery(query);
+      const daysMatch = query.match(/(\d+)\s*days?/i);
+      const daysText = daysMatch ? ` within ${daysMatch[1]} days` : ' (next 30d)';
+      const subject = person ? `deadlines for ${person}` : 'upcoming deadlines';
+      const headline = count === 0
+        ? `No ${subject} require attention${daysText}.`
+        : `${count} ${subject} require attention${daysText}.`;
       return {
         query,
-        headline: `${count} upcoming deadlines require attention.`,
-        accentWord: `${count} upcoming deadlines`,
-        chips: [{ label: `${count} tasks pending`, color: 'amber' }]
+        headline,
+        accentWord: count === 0 ? `No ${subject}` : `${count} ${subject}`,
+        chips: [{ label: `${count} tasks pending`, color: count > 0 ? 'amber' : 'green' }]
       };
     }
 
@@ -298,7 +326,7 @@
 
 <svelte:window on:keydown={(e) => { if (e.key === 'Escape' && isCenterSheet) dismissResult(); }} />
 
-<div class="ambient-canvas">
+<div class="ambient-canvas" class:has-sheet={isCenterSheet}>
   {#if isCenterSheet}
     <button
       type="button"
@@ -378,6 +406,9 @@
       <div class="bottom-dock">
         <InputDock onSend={onSend} />
       </div>
+
+      <!-- Disclaimer line: Glean gives guidance only. Verify on the official site. -->
+      <p class="disclaimer-line">Glean gives guidance only. Verify on the official site.</p>
     {/if}
 
     <!-- ================= CENTER SHEET (FOR ALL QUERIES) ================= -->
@@ -457,12 +488,20 @@
   .ambient-canvas {
     position: relative;
     width: 100%;
+    height: 100%;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
-    padding: var(--sp-24) var(--sp-16) var(--sp-20) var(--sp-16);
-    overflow: visible;
+    padding: 96px var(--sp-16) 16px var(--sp-16);
+    overflow: hidden;
+  }
+
+  .ambient-canvas.has-sheet {
+    justify-content: flex-start;
+    padding-top: 80px;
+    overflow-y: auto;
   }
 
   /* Dotted Grid Background - subtle design texture, non-intrusive */
@@ -480,16 +519,16 @@
     background-image: radial-gradient(circle, rgba(255, 255, 255, 0.09) 1px, transparent 1.25px);
   }
 
-  /* Concentric Sonar Rings - perfectly centered on the 140px hero orb center (padding 24px + margin-top 12px + half-orb 70px = 106px) */
+  /* Concentric Sonar Rings - centered cleanly on hero orb (canvas padding 96px + stage margin 4px + half-orb 70px = 170px) */
   .sonar-container {
     position: absolute;
-    top: 106px;
+    top: 170px;
     left: 50%;
     transform: translate(-50%, -50%);
     width: 0;
     height: 0;
     pointer-events: none;
-    z-index: 0;
+    z-index: 1;
     transition: opacity 300ms ease;
   }
 
@@ -607,26 +646,49 @@
     box-shadow: 0 0 8px rgba(6, 182, 212, 0.7);
   }
 
-  /* Precise positions matching the "4. Ambient" layout design — safely spaced along sonar rings */
+  /* Precise scattered positions across the concentric sonar rings */
   .pos-top-left {
     right: calc(50% + 430px);
-    top: 75px;
+    top: 110px;
   }
   .pos-mid-left {
     right: calc(50% + 350px);
-    top: 220px;
+    top: 255px;
   }
   .pos-bot-left {
     right: calc(50% + 440px);
-    top: 380px;
+    top: 415px;
   }
   .pos-top-right {
     left: calc(50% + 430px);
-    top: 105px;
+    top: 140px;
   }
   .pos-bot-right {
     left: calc(50% + 360px);
-    top: 275px;
+    top: 310px;
+  }
+
+  @media (max-width: 1260px) {
+    .pos-top-left {
+      right: calc(50% + 360px);
+      top: 115px;
+    }
+    .pos-mid-left {
+      right: calc(50% + 310px);
+      top: 260px;
+    }
+    .pos-bot-left {
+      right: calc(50% + 370px);
+      top: 415px;
+    }
+    .pos-top-right {
+      left: calc(50% + 360px);
+      top: 145px;
+    }
+    .pos-bot-right {
+      left: calc(50% + 310px);
+      top: 315px;
+    }
   }
 
   /* Gentle Floating Animations */
@@ -662,10 +724,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-16);
+    gap: 12px;
     max-width: 560px;
     width: 100%;
-    margin-top: 12px;
+    margin-top: 4px;
     transition: max-width 400ms var(--ease), gap 400ms var(--ease);
   }
 
@@ -818,6 +880,16 @@
     margin-top: 10px;
   }
 
+  /* Disclaimer Line directly below input box */
+  .disclaimer-line {
+    margin: 10px auto 12px auto;
+    text-align: center;
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.4;
+    user-select: none;
+  }
+
   /* ================= GENERAL CENTER SHEET CONTENT ================= */
   .general-sheet-content {
     width: 100%;
@@ -862,29 +934,14 @@
 
   /* ================= RESPONSIVE ================= */
   @media (max-width: 1080px) {
-    .ambient-chips-container {
-      position: static;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: var(--sp-8);
-      margin-bottom: var(--sp-16);
-      max-width: 600px;
-    }
-
-    .ambient-chip {
-      position: static;
-      animation: none;
-    }
-
-    .pos-top-left, .pos-mid-left, .pos-bot-left, .pos-top-right, .pos-bot-right {
-      left: auto;
-      right: auto;
-      top: auto;
-    }
-
     .ring-3, .ring-4 {
       display: none;
+    }
+  }
+
+  @media (max-width: 1140px) {
+    .ambient-chips-container {
+      display: none !important;
     }
   }
 

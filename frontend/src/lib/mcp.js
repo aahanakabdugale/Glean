@@ -194,8 +194,10 @@ export async function callFamilyBrief(memberName = '') {
   };
 }
 
-export async function callGetExpiringDocuments(days = 30) {
-  const raw = await callTool('get_expiring_documents', { days });
+export async function callGetExpiringDocuments(days = 30, memberName = '') {
+  const args = { days };
+  if (memberName && memberName !== 'all') args.member_name = memberName;
+  const raw = await callTool('get_expiring_documents', args);
   if (raw.ok) {
     const parsed = parseExpiringDocs(raw.text);
     return {
@@ -206,19 +208,24 @@ export async function callGetExpiringDocuments(days = 30) {
     };
   }
   const demo = demoExpiringDocs();
+  const filtered = memberName && memberName !== 'all'
+    ? demo.data.filter(d => d.member.toLowerCase() === memberName.toLowerCase())
+    : demo.data;
   return {
     ok: true,
     text: demo.text,
     isLive: false,
     ms: 0,
     resultType: 'expiring_docs',
-    resultData: demo.data,
-    spokenText: generateExpiringDocsSpokenBrief(demo.data, days)
+    resultData: filtered,
+    spokenText: generateExpiringDocsSpokenBrief(filtered, days)
   };
 }
 
-export async function callListUpcomingTasks(days = 30) {
-  const raw = await callTool('list_upcoming_tasks', { days });
+export async function callListUpcomingTasks(days = 30, memberName = '') {
+  const args = { days };
+  if (memberName && memberName !== 'all') args.member_name = memberName;
+  const raw = await callTool('list_upcoming_tasks', args);
   if (raw.ok) {
     const parsed = parseUpcomingTasks(raw.text);
     return {
@@ -229,19 +236,26 @@ export async function callListUpcomingTasks(days = 30) {
     };
   }
   const demo = demoUpcomingTasks();
+  const filtered = memberName && memberName !== 'all'
+    ? demo.data.filter(t => (t.member || '').toLowerCase() === memberName.toLowerCase())
+    : demo.data;
   return {
     ok: true,
     text: demo.text,
     isLive: false,
     ms: 0,
     resultType: 'upcoming_tasks',
-    resultData: demo.data,
-    spokenText: generateTasksSpokenBrief(demo.data, days)
+    resultData: filtered,
+    spokenText: generateTasksSpokenBrief(filtered, days)
   };
 }
 
-export async function callCheckSchemeEligibility(name, tags = '') {
-  const raw = await callTool('check_scheme_eligibility', { name, tags });
+export async function callCheckSchemeEligibility(name, tags = '', country = '') {
+  const args = { name, tags };
+  if (country && country !== 'all') {
+    args.country = country;
+  }
+  const raw = await callTool('check_scheme_eligibility', args);
   if (raw.ok) {
     const parsed = parseEligibility(raw.text, name);
     return {
@@ -262,6 +276,7 @@ export async function callCheckSchemeEligibility(name, tags = '') {
     spokenText: generateEligibilitySpokenBrief(demo.data, name)
   };
 }
+
 
 export async function callGetSchemeChecklist(scheme) {
   const raw = await callTool('get_scheme_checklist', { scheme });
@@ -336,12 +351,43 @@ export async function callAddFamilyMember(name, relation, birth_year, status) {
   return callTool('add_family_member', { name, relation, birth_year, status });
 }
 
+export async function callRemoveFamilyMember(name) {
+  return callTool('remove_family_member', { name });
+}
+
+export async function callResetFamilyRoster() {
+  return callTool('reset_family_roster', {});
+}
+
 export async function callAddDocument(doc_type, owner, expiry_date) {
   return callTool('add_document', { doc_type, owner, expiry_date });
 }
 
 export async function callAddTask(title, due_date, owner = '') {
   return callTool('add_task', { title, due_date, owner });
+}
+
+export async function callCompleteTask(taskTitle = '', memberName = '', taskId = 0) {
+  const args = {};
+  if (taskTitle) args.task_title = taskTitle;
+  if (memberName && memberName !== 'all') args.member_name = memberName;
+  if (taskId) args.task_id = taskId;
+  const raw = await callTool('complete_task', args);
+  if (raw.ok) {
+    return {
+      ...raw,
+      spokenText: raw.text || 'Task completed.'
+    };
+  }
+  const who = memberName && memberName !== 'all' ? ` for ${memberName}` : '';
+  const text = `Completed: '${taskTitle || 'Task'}'${who}.`;
+  return {
+    ok: true,
+    text,
+    isLive: false,
+    ms: 0,
+    spokenText: text
+  };
 }
 
 export async function callOrchestrateLifeEvent(memberName, eventType, notes = '') {
@@ -459,13 +505,23 @@ function parseExpiringDocs(text) {
 }
 
 function parseUpcomingTasks(text) {
-  return text.split('\n').filter(Boolean).map(line => {
+  const seen = new Set();
+  const tasks = [];
+  for (const line of text.split('\n').filter(Boolean)) {
     const m = line.match(/^(.+?)(?: \((.+?)\))? - (\d{4}-\d{2}-\d{2}) \((.+?)\)/);
-    if (!m) return { raw: line };
+    if (!m) {
+      tasks.push({ raw: line });
+      continue;
+    }
     const [, title, member, dueDate, statusText] = m;
-    const overdue = statusText.startsWith('OVERDUE');
-    return { title, member: member || null, dueDate, statusText, overdue };
-  });
+    const key = `${title.trim().toLowerCase()}_${(member || '').trim().toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      const overdue = statusText.startsWith('OVERDUE');
+      tasks.push({ title, member: member || null, dueDate, statusText, overdue });
+    }
+  }
+  return tasks;
 }
 
 function parseEligibility(text, personName) {
@@ -532,12 +588,12 @@ function parsePlan(text) {
 
 function parseFamilyBrief(text) {
   // Return raw text plus parsed sub-sections
-  const expiringMatch = text.match(/Expiring Documents[^:]*: (\d+)/);
-  const tasksMatch = text.match(/Upcoming Tasks[^:]*: (\d+)/);
+  const expiringMatch = text.match(/(?:Expiring Documents|Your Expiring Documents)[^:]*: (\d+)/i);
+  const tasksMatch = text.match(/(?:Upcoming Tasks|Upcoming Deadlines|Your Upcoming Tasks|Your Upcoming Deadlines)[^:]*: (\d+)/i);
   return {
     raw: text,
-    expiringCount: expiringMatch ? parseInt(expiringMatch[1]) : 0,
-    tasksCount: tasksMatch ? parseInt(tasksMatch[1]) : 0,
+    expiringCount: expiringMatch ? parseInt(expiringMatch[1], 10) : 0,
+    tasksCount: tasksMatch ? parseInt(tasksMatch[1], 10) : 0,
   };
 }
 
@@ -552,14 +608,20 @@ function parseFamilyMembers(text) {
 
 // ---------- Demo data (shown when server is offline) ------
 
+function getIsoDate(daysOffset) {
+  const d = new Date();
+  d.setDate(d.getDate() + daysOffset);
+  return d.toISOString().split('T')[0];
+}
+
 function demoExpiringDocs() {
   const data = [
-    { member: 'Chandler', docType: 'Passport', expiryDate: '2026-10-15', statusText: 'URGENT, 6 days left', daysLeft: 6, urgency: 'urgent' },
-    { member: 'Justin',   docType: 'Motor Vehicle Insurance', expiryDate: '2026-10-21', statusText: 'URGENT, 12 days left', daysLeft: 12, urgency: 'urgent' },
-    { member: 'Gwen',     docType: 'University Transit Pass', expiryDate: '2026-10-24', statusText: '15 days left', daysLeft: 15, urgency: 'soon' },
-    { member: 'Amy',      docType: 'Pension Verification Certificate', expiryDate: '2026-10-27', statusText: '18 days left', daysLeft: 18, urgency: 'soon' },
-    { member: 'Justin',   docType: 'Driving Licence', expiryDate: '2026-10-31', statusText: '22 days left', daysLeft: 22, urgency: 'soon' },
-    { member: 'Riley',    docType: 'Health Insurance Policy', expiryDate: '2026-11-06', statusText: '28 days left', daysLeft: 28, urgency: 'soon' },
+    { member: 'Chandler', docType: 'Passport', expiryDate: getIsoDate(6), statusText: 'URGENT, 6 days left', daysLeft: 6, urgency: 'urgent' },
+    { member: 'Justin',   docType: 'Motor Vehicle Insurance', expiryDate: getIsoDate(12), statusText: 'URGENT, 12 days left', daysLeft: 12, urgency: 'urgent' },
+    { member: 'Gwen',     docType: 'University Transit Pass', expiryDate: getIsoDate(15), statusText: '15 days left', daysLeft: 15, urgency: 'soon' },
+    { member: 'Amy',      docType: 'Pension Verification Certificate', expiryDate: getIsoDate(18), statusText: '18 days left', daysLeft: 18, urgency: 'soon' },
+    { member: 'Justin',   docType: 'Driving Licence', expiryDate: getIsoDate(22), statusText: '22 days left', daysLeft: 22, urgency: 'soon' },
+    { member: 'Riley',    docType: 'Health Insurance Policy', expiryDate: getIsoDate(28), statusText: '28 days left', daysLeft: 28, urgency: 'soon' },
   ];
   return {
     text: data.map(d => `${d.member}'s ${d.docType} - ${d.expiryDate} (${d.statusText})`).join('\n'),
@@ -569,8 +631,8 @@ function demoExpiringDocs() {
 
 function demoUpcomingTasks() {
   const data = [
-    { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: '2026-10-13', statusText: '4 days left', overdue: false },
-    { title: 'Check Ayushman & senior benefits',     member: 'Chandler', dueDate: '2026-10-17', statusText: '8 days left', overdue: false },
+    { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: getIsoDate(4), statusText: '4 days left', overdue: false },
+    { title: 'Check Ayushman & senior benefits',     member: 'Chandler', dueDate: getIsoDate(10), statusText: '10 days left', overdue: false },
   ];
   return {
     text: data.map(t => `${t.title} (${t.member}) - ${t.dueDate} (${t.statusText})`).join('\n'),
@@ -610,12 +672,14 @@ function demoChecklist(scheme) {
 }
 
 function demoPlan(name, scheme) {
+  const d1 = getIsoDate(2);
+  const d2 = getIsoDate(9);
   return {
-    text: `Application plan created for ${name} — Senior Citizens Savings Scheme (SCSS):\n• Eligibility status: May Be Eligible\n• Task 1 created: Gather documents by 2026-10-15\n• Task 2 created: Submit application by 2026-10-22\n• Official portal: https://www.indiapost.gov.in\n\nDocuments needed:\n  - Age proof\n  - Identity & address proof`,
+    text: `Application plan created for ${name} — Senior Citizens Savings Scheme (SCSS):\n• Eligibility status: May Be Eligible\n• Task 1 created: Gather documents by ${d1}\n• Task 2 created: Submit application by ${d2}\n• Official portal: https://www.indiapost.gov.in\n\nDocuments needed:\n  - Age proof\n  - Identity & address proof`,
     data: {
       schemeName: 'Senior Citizens Savings Scheme (SCSS)',
       status: 'May Be Eligible',
-      tasks: ['Task 1: Gather documents by 2026-10-15', 'Task 2: Submit application by 2026-10-22'],
+      tasks: [`Task 1: Gather documents by ${d1}`, `Task 2: Submit application by ${d2}`],
       portal: 'https://www.indiapost.gov.in',
       docs: ['Age proof', 'Identity & address proof'],
     },
@@ -623,11 +687,14 @@ function demoPlan(name, scheme) {
 }
 
 function demoFamilyBrief(memberName = '') {
+  const pExp = getIsoDate(6);
+  const pDue = getIsoDate(4);
+  const jExp = getIsoDate(22);
   if (memberName && memberName !== 'all') {
-    const text = `Personal Briefing for ${memberName}:\n\nYour Expiring Documents (next 30 days): 1\n• Passport: 2026-10-15 (urgent (6d left))\n\nYour Upcoming Deadlines (next 14 days): 1\n• Renew passport appointment — due 2026-10-13 (4d left)\n\nGovernment Benefits You May Qualify For:\n• Ayushman Vay Vandana Card (AB PM-JAY)\n• Senior Citizens Savings Scheme (SCSS)\nAsk me 'Plan the application' or 'What documents are needed' anytime!`;
+    const text = `Personal Briefing for ${memberName}:\n\nYour Expiring Documents (next 30 days): 1\n• Passport: ${pExp} (urgent (6d left))\n\nYour Upcoming Deadlines (next 14 days): 1\n• Renew passport appointment — due ${pDue} (4d left)\n\nGovernment Benefits You May Qualify For:\n• Ayushman Vay Vandana Card (AB PM-JAY)\n• Senior Citizens Savings Scheme (SCSS)\nAsk me 'Plan the application' or 'What documents are needed' anytime!`;
     return { text, data: { raw: text, expiringCount: 1, tasksCount: 1 } };
   }
-  const text = `Family Briefing (6 family members tracked):\n\nExpiring Documents (next 30 days): 2\n• Chandler's Passport: 2026-10-15 (urgent, 6d left)\n• Justin's Driving Licence: 2026-10-29 (20d left)\n\nUpcoming Tasks (next 14 days): 1\n• Renew Chandler's passport appointment (Chandler) — due 2026-10-13 (4d left)`;
+  const text = `Family Briefing (6 family members tracked):\n\nExpiring Documents (next 30 days): 2\n• Chandler's Passport: ${pExp} (urgent, 6d left)\n• Justin's Driving Licence: ${jExp} (22d left)\n\nUpcoming Tasks (next 14 days): 1\n• Renew Chandler's passport appointment (Chandler) — due ${pDue} (4d left)`;
   return { text, data: { raw: text, expiringCount: 2, tasksCount: 1 } };
 }
 
@@ -704,13 +771,19 @@ function parseDashboard(text) {
         }
       }
     } else if (title === 'UPCOMING DEADLINES' || sec.includes('UPCOMING DEADLINES')) {
+      const seenTasks = new Set();
       for (const line of lines) {
         const m = line.match(/^• (.+?) — due (\d{4}-\d{2}-\d{2}) \[(.+?)\]$/);
         if (m) {
-          const status = m[3];
-          const daysMatch = status.match(/-?\d+/);
-          const daysLeft = daysMatch ? parseInt(daysMatch[0], 10) : null;
-          tasks.push({ title: m[1], dueDate: m[2], status, daysLeft });
+          const rawTitle = m[1].trim();
+          const key = rawTitle.toLowerCase();
+          if (!seenTasks.has(key)) {
+            seenTasks.add(key);
+            const status = m[3];
+            const daysMatch = status.match(/-?\d+/);
+            const daysLeft = daysMatch ? parseInt(daysMatch[0], 10) : null;
+            tasks.push({ title: rawTitle, dueDate: m[2], status, daysLeft });
+          }
         }
       }
     } else if (title === 'BENEFIT OPPORTUNITIES' || sec.includes('BENEFIT OPPORTUNITIES')) {
@@ -724,6 +797,12 @@ function parseDashboard(text) {
 }
 
 function demoDashboardData() {
+  const pExp = getIsoDate(6);
+  const jIns = getIsoDate(12);
+  const gPass = getIsoDate(15);
+  const t1 = getIsoDate(4);
+  const t2 = getIsoDate(10);
+  const t3 = getIsoDate(14);
   return {
     metrics: {
       totalMembers: 6,
@@ -737,14 +816,14 @@ function demoDashboardData() {
     },
     members: demoMembersData(),
     expiring: [
-      { owner: 'Chandler', member: 'Chandler', docType: 'Passport', expiryDate: '2026-10-21', status: 'URGENT (6d left)', daysLeft: 6 },
-      { owner: 'Justin', member: 'Justin', docType: 'Motor Vehicle Insurance', expiryDate: '2026-10-27', status: '12d left', daysLeft: 12 },
-      { owner: 'Gwen', member: 'Gwen', docType: 'University Transit Pass', expiryDate: '2026-10-30', status: '15d left', daysLeft: 15 },
+      { owner: 'Chandler', member: 'Chandler', docType: 'Passport', expiryDate: pExp, status: 'URGENT (6d left)', daysLeft: 6 },
+      { owner: 'Justin', member: 'Justin', docType: 'Motor Vehicle Insurance', expiryDate: jIns, status: '12d left', daysLeft: 12 },
+      { owner: 'Gwen', member: 'Gwen', docType: 'University Transit Pass', expiryDate: gPass, status: '15d left', daysLeft: 15 },
     ],
     tasks: [
-      { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: '2026-10-19', status: '4d left', daysLeft: 4 },
-      { title: "Check Ayushman & senior benefits", member: 'Chandler', dueDate: '2026-10-25', status: '10d left', daysLeft: 10 },
-      { title: "Vehicle insurance renewal check", member: 'Justin', dueDate: '2026-10-29', status: '14d left', daysLeft: 14 },
+      { title: "Renew Chandler's passport appointment", member: 'Chandler', dueDate: t1, status: '4d left', daysLeft: 4 },
+      { title: "Check Ayushman & senior benefits", member: 'Chandler', dueDate: t2, status: '10d left', daysLeft: 10 },
+      { title: "Vehicle insurance renewal check", member: 'Justin', dueDate: t3, status: '14d left', daysLeft: 14 },
     ],
     benefits: [
       "Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)",
@@ -757,7 +836,12 @@ function demoDashboardData() {
 }
 
 function demoDashboardText() {
-  return `=== FAMILY ADMIN DASHBOARD (6 Members Tracked) ===\n• Documents: 18 tracked (3 expiring in 60d, 1 urgent)\n• Tasks: 4 pending (3 due in 30d, 0 overdue)\n• Scheme Opportunities: 4 matches identified\n\n--- FAMILY ROSTER ---\n• Chandler (grandfather) — Born 1950, retired\n• Amy (grandmother) — Born 1953, retired\n• Justin (father) — Born 1968, employed\n• Riley (mother) — Born 1972, employed\n• Jace (son) — Born 2000, family admin\n• Gwen (daughter) — Born 2003, family admin\n\n--- EXPIRING DOCUMENTS ---\n• Chandler's Passport — expires 2026-10-21 [URGENT (6d left)]\n• Justin's Motor Vehicle Insurance — expires 2026-10-27 [12d left]\n• Gwen's University Transit Pass — expires 2026-10-30 [15d left]\n\n--- UPCOMING DEADLINES ---\n• Renew Chandler's passport appointment (Chandler) — due 2026-10-19 [4d left]\n• Check Ayushman & senior benefits (Chandler) — due 2026-10-25 [10d left]\n\n--- BENEFIT OPPORTUNITIES ---\n• Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n• Amy qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n\nNote: Guidance only. Verified on official portals.`;
+  const pExp = getIsoDate(6);
+  const jIns = getIsoDate(12);
+  const gPass = getIsoDate(15);
+  const t1 = getIsoDate(4);
+  const t2 = getIsoDate(10);
+  return `=== FAMILY ADMIN DASHBOARD (6 Members Tracked) ===\n• Documents: 18 tracked (3 expiring in 60d, 1 urgent)\n• Tasks: 4 pending (3 due in 30d, 0 overdue)\n• Scheme Opportunities: 4 matches identified\n\n--- FAMILY ROSTER ---\n• Chandler (grandfather) — Born 1950, retired\n• Amy (grandmother) — Born 1953, retired\n• Justin (father) — Born 1968, employed\n• Riley (mother) — Born 1972, employed\n• Jace (son) — Born 2000, family admin\n• Gwen (daughter) — Born 2003, family admin\n\n--- EXPIRING DOCUMENTS ---\n• Chandler's Passport — expires ${pExp} [URGENT (6d left)]\n• Justin's Motor Vehicle Insurance — expires ${jIns} [12d left]\n• Gwen's University Transit Pass — expires ${gPass} [15d left]\n\n--- UPCOMING DEADLINES ---\n• Renew Chandler's passport appointment (Chandler) — due ${t1} [4d left]\n• Check Ayushman & senior benefits (Chandler) — due ${t2} [10d left]\n\n--- BENEFIT OPPORTUNITIES ---\n• Chandler qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n• Amy qualifies for Ayushman Vay Vandana Card (AB PM-JAY)\n\nNote: Guidance only. Verified on official portals.`;
 }
 
 // ---------- Parsers for Interactive Pipeline DAGs ----------
@@ -981,7 +1065,7 @@ function demoAuditDependencies(memberName = '') {
       members: [
         {
           name: 'Amy', relation: 'grandmother', birthYear: 1953, status: 'risk', blockers: [],
-          risks: [{ doc: 'Pension Life Verification Certificate', daysLeft: 18, expiry: '2026-11-04', atRiskScheme: 'Pension Disbursement & Senior Concessions' }],
+          risks: [{ doc: 'Pension Life Verification Certificate', daysLeft: 18, expiry: getIsoDate(18), atRiskScheme: 'Pension Disbursement & Senior Concessions' }],
           ready: ['Ayushman Vay Vandana Card (AB PM-JAY)']
         }
       ],
@@ -1001,7 +1085,7 @@ function demoAuditDependencies(memberName = '') {
       members: [
         {
           name: 'Justin', relation: 'father', birthYear: 1968, status: 'risk', blockers: [],
-          risks: [{ doc: 'Motor Vehicle Comprehensive Insurance', daysLeft: 12, expiry: '2026-10-29', atRiskScheme: 'Vehicle Registration & Active Cover' }],
+          risks: [{ doc: 'Motor Vehicle Comprehensive Insurance', daysLeft: 12, expiry: getIsoDate(12), atRiskScheme: 'Vehicle Registration & Active Cover' }],
           ready: ['Senior Citizens Savings Scheme']
         }
       ],
@@ -1021,7 +1105,7 @@ function demoAuditDependencies(memberName = '') {
       members: [
         {
           name: 'Riley', relation: 'mother', birthYear: 1972, status: 'risk', blockers: [],
-          risks: [{ doc: 'Health Insurance Policy', daysLeft: 28, expiry: '2026-11-14', atRiskScheme: 'Family Cashless Health Cover' }],
+          risks: [{ doc: 'Health Insurance Policy', daysLeft: 28, expiry: getIsoDate(28), atRiskScheme: 'Family Cashless Health Cover' }],
           ready: []
         }
       ],
@@ -1041,7 +1125,7 @@ function demoAuditDependencies(memberName = '') {
       members: [
         {
           name: 'Gwen', relation: 'daughter', birthYear: 2003, status: 'risk', blockers: [],
-          risks: [{ doc: 'University Transit Pass', daysLeft: 15, expiry: '2026-11-01', atRiskScheme: 'Student Transit Concession Pass' }],
+          risks: [{ doc: 'University Transit Pass', daysLeft: 15, expiry: getIsoDate(15), atRiskScheme: 'Student Transit Concession Pass' }],
           ready: ['DigiLocker Student Vault']
         }
       ],
@@ -1059,7 +1143,7 @@ function demoAuditDependencies(memberName = '') {
     criticalBlockers: 0,
     impendingRisks: 1,
     members: [
-      { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'risk', blockers: [], risks: [{ doc: 'Passport', daysLeft: 6, expiry: '2026-10-23', atRiskScheme: 'Ayushman Vay Vandana Card (AB PM-JAY)' }, { doc: 'Passport', daysLeft: 6, expiry: '2026-10-23', atRiskScheme: 'Senior Citizens Savings Scheme' }], ready: [] },
+      { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'risk', blockers: [], risks: [{ doc: 'Passport', daysLeft: 6, expiry: getIsoDate(6), atRiskScheme: 'Ayushman Vay Vandana Card (AB PM-JAY)' }, { doc: 'Passport', daysLeft: 6, expiry: getIsoDate(6), atRiskScheme: 'Senior Citizens Savings Scheme' }], ready: [] },
       { name: 'Amy', relation: 'grandmother', birthYear: 1953, status: 'ok', blockers: [], risks: [], ready: [] },
       { name: 'Justin', relation: 'father', birthYear: 1968, status: 'ok', blockers: [], risks: [], ready: ['Senior Citizens Savings Scheme'] },
       { name: 'Riley', relation: 'mother', birthYear: 1972, status: 'ok', blockers: [], risks: [], ready: [] },
@@ -1172,9 +1256,9 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
       vaultDocs: ['Passport', 'Driving Licence', 'Term Life Insurance Policy'],
       missingDocs: [],
       phases: [
-        { dayOffset: 7, dueDate: '2026-10-24', task: 'Set up EPF & UAN employer portal sync for Jace' },
-        { dayOffset: 21, dueDate: '2026-11-07', task: 'Review independent term life insurance coverage for Jace' },
-        { dayOffset: 45, dueDate: '2026-12-01', task: 'Select tax regime and allocate sovereign gold savings for Jace' }
+        { dayOffset: 7, dueDate: getIsoDate(7), task: 'Set up EPF & UAN employer portal sync for Jace' },
+        { dayOffset: 21, dueDate: getIsoDate(21), task: 'Review independent term life insurance coverage for Jace' },
+        { dayOffset: 45, dueDate: getIsoDate(45), task: 'Select tax regime and allocate sovereign gold savings for Jace' }
       ],
       spokenBrief: "I've prepared an adulthood independence roadmap for Jace with 3 scheduled milestone tasks."
     };
@@ -1194,9 +1278,9 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
       vaultDocs: ['Passport', 'Student Health Insurance'],
       missingDocs: [],
       phases: [
-        { dayOffset: 7, dueDate: '2026-10-24', task: 'Submit semester enrollment receipt to renew University Transit Pass for Gwen' },
-        { dayOffset: 21, dueDate: '2026-11-07', task: 'Verify Aadhaar DBT bank linkage for Central Sector Interest Subsidy for Gwen' },
-        { dayOffset: 45, dueDate: '2026-12-01', task: 'Sync digital degree credentials with DigiLocker student vault for Gwen' }
+        { dayOffset: 7, dueDate: getIsoDate(7), task: 'Submit semester enrollment receipt to renew University Transit Pass for Gwen' },
+        { dayOffset: 21, dueDate: getIsoDate(21), task: 'Verify Aadhaar DBT bank linkage for Central Sector Interest Subsidy for Gwen' },
+        { dayOffset: 45, dueDate: getIsoDate(45), task: 'Sync digital degree credentials with DigiLocker student vault for Gwen' }
       ],
       spokenBrief: "I've prepared a graduation roadmap for Gwen with 3 scheduled milestone tasks."
     };
@@ -1216,9 +1300,9 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
       vaultDocs: ['Passport', 'Senior Citizen Health Insurance', 'Fixed Deposit Scheme Certificate'],
       missingDocs: [],
       phases: [
-        { dayOffset: 7, dueDate: '2026-10-24', task: 'Set up facial biometrics on Jeevan Pramaan App for Chandler' },
-        { dayOffset: 30, dueDate: '2026-11-16', task: 'Renew Ayushman Vay Vandana Card in-patient registration for Chandler' },
-        { dayOffset: 60, dueDate: '2026-12-16', task: 'Direct pension credit verification with State Bank for Chandler' }
+        { dayOffset: 7, dueDate: getIsoDate(7), task: 'Set up facial biometrics on Jeevan Pramaan App for Chandler' },
+        { dayOffset: 30, dueDate: getIsoDate(30), task: 'Renew Ayushman Vay Vandana Card in-patient registration for Chandler' },
+        { dayOffset: 60, dueDate: getIsoDate(60), task: 'Direct pension credit verification with State Bank for Chandler' }
       ],
       spokenBrief: "I've prepared a super-senior roadmap for Chandler with 3 scheduled milestone tasks."
     };
@@ -1238,10 +1322,10 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
       vaultDocs: ['Ayushman Vay Vandana Health Card', 'Post Office Senior Savings Certificate'],
       missingDocs: [],
       phases: [
-        { dayOffset: 7, dueDate: '2026-10-24', task: 'Submit annual pension life certificate before 18-day deadline for Amy' },
-        { dayOffset: 30, dueDate: '2026-11-16', task: 'Designate Ayushman Form-B for in-patient cover while preserving outpatient access for Amy' },
-        { dayOffset: 60, dueDate: '2026-12-16', task: 'Quarterly SCSS interest disbursement audit for Amy' },
-        { dayOffset: 90, dueDate: '2027-01-15', task: 'Annual preventative wellness review at empanelled hospital for Amy' }
+        { dayOffset: 7, dueDate: getIsoDate(7), task: 'Submit annual pension life certificate before 18-day deadline for Amy' },
+        { dayOffset: 30, dueDate: getIsoDate(30), task: 'Designate Ayushman Form-B for in-patient cover while preserving outpatient access for Amy' },
+        { dayOffset: 60, dueDate: getIsoDate(60), task: 'Quarterly SCSS interest disbursement audit for Amy' },
+        { dayOffset: 90, dueDate: getIsoDate(90), task: 'Annual preventative wellness review at empanelled hospital for Amy' }
       ],
       spokenBrief: "I've prepared a healthcare and pension transition roadmap for Amy with 4 scheduled milestone tasks."
     };
@@ -1261,9 +1345,9 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
       vaultDocs: ['Driving Licence', 'Professional Membership Card'],
       missingDocs: [],
       phases: [
-        { dayOffset: 7, dueDate: '2026-10-24', task: 'Renew Family Health Insurance policy with accumulated cumulative bonus for Riley' },
-        { dayOffset: 21, dueDate: '2026-11-07', task: 'Complete digital Re-KYC for mutual fund family portfolio for Riley' },
-        { dayOffset: 45, dueDate: '2026-12-01', task: 'Rebalance tax deductions under Section 80D and Section 80C for Riley' }
+        { dayOffset: 7, dueDate: getIsoDate(7), task: 'Renew Family Health Insurance policy with accumulated cumulative bonus for Riley' },
+        { dayOffset: 21, dueDate: getIsoDate(21), task: 'Complete digital Re-KYC for mutual fund family portfolio for Riley' },
+        { dayOffset: 45, dueDate: getIsoDate(45), task: 'Rebalance tax deductions under Section 80D and Section 80C for Riley' }
       ],
       spokenBrief: "I've prepared an estate and healthcare roadmap for Riley with 3 scheduled milestone tasks."
     };
@@ -1283,10 +1367,10 @@ function demoLifeEvent(memberName = 'Justin', eventType = 'retirement') {
     vaultDocs: ['Driving Licence', 'Passport'],
     missingDocs: ['Age proof', 'Aadhaar card', 'Bank account passbook', 'Pension/Superannuation Order'],
     phases: [
-      { dayOffset: 7, dueDate: '2026-10-24', task: 'Consolidate pension papers & superannuation documents for Justin' },
-      { dayOffset: 30, dueDate: '2026-11-16', task: 'Apply for Senior Citizens Savings Scheme (SCSS) / deposit setup for Justin' },
-      { dayOffset: 60, dueDate: '2026-12-16', task: 'Review health coverage & register for Ayushman Vay Vandana card for Justin' },
-      { dayOffset: 90, dueDate: '2027-01-15', task: 'Submit annual Digital Life Certificate (Jeevan Pramaan) for Justin' }
+      { dayOffset: 7, dueDate: getIsoDate(7), task: 'Consolidate pension papers & superannuation documents for Justin' },
+      { dayOffset: 30, dueDate: getIsoDate(30), task: 'Apply for Senior Citizens Savings Scheme (SCSS) / deposit setup for Justin' },
+      { dayOffset: 60, dueDate: getIsoDate(60), task: 'Review health coverage & register for Ayushman Vay Vandana card for Justin' },
+      { dayOffset: 90, dueDate: getIsoDate(90), task: 'Submit annual Digital Life Certificate (Jeevan Pramaan) for Justin' }
     ],
     spokenBrief: "I've prepared a phased retirement roadmap for Justin with 4 scheduled milestone tasks."
   };

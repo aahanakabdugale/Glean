@@ -153,6 +153,19 @@ activePersona.subscribe(p => {
   localStorage.setItem('glean-active-persona', p);
 });
 
+// ---------- ACTIVE JURISDICTION ("Global / IN / US") ----------
+function initJurisdiction() {
+  const saved = localStorage.getItem('glean-jurisdiction');
+  return saved || 'all'; // 'all' | 'IN' | 'US'
+}
+
+export const activeJurisdiction = writable(initJurisdiction());
+
+activeJurisdiction.subscribe(j => {
+  localStorage.setItem('glean-jurisdiction', j);
+});
+
+
 // Cache of registered family members used to populate the persona dropdown
 export const familyMembersList = writable([
   { name: 'Chandler', relation: 'grandfather', birthYear: 1950, status: 'retired' },
@@ -183,7 +196,7 @@ export function clearToolTraces() {
 }
 
 export function toggleTracePanel() {
-  showTracePanel.update(v => !v);
+  activeView.update(v => v === 'traces' ? 'chat' : 'traces');
 }
 
 // ---------- PROACTIVE AMBIENT PUSH ALERTS (SSE) -------------
