@@ -96,3 +96,13 @@ def test_security_sanitization(db_conn):
     add_family_member("Justin", "father", 1968, "employed")
     res = simulate_bureaucratic_conflicts("Justin; DROP TABLE tasks; --")
     assert "reserved words" in res or "not allowed" in res
+
+
+def test_us_medicare_hsa_conflict(db_conn):
+    add_family_member("Chandler", "grandfather", 1950, "employed with HSA")
+    res = simulate_bureaucratic_conflicts("Chandler", target_schemes="us_medicare")
+    assert "STATUTORY TAX PENALTY COLLISION" in res
+    assert "IRS Medicare-HSA Contribution Bar" in res
+    assert "Medicare (Parts A & B) vs. Health Savings Account (HSA)" in res
+    assert "6% excise penalty" in res
+

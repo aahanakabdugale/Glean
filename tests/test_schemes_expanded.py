@@ -1,9 +1,7 @@
 """
-Tests for Scheme Expansion (4 -> 8 schemes):
-- PMJJBY: Pradhan Mantri Jeevan Jyoti Bima Yojana
-- PMSBY: Pradhan Mantri Suraksha Bima Yojana
-- SSY: Sukanya Samriddhi Yojana
-- PM-KISAN: PM Kisan Samman Nidhi
+Tests for Scheme Expansion & Multi-Jurisdiction Catalog:
+- India (8 schemes): PMJJBY, PMSBY, SSY, PM-KISAN, IGNOAPS, Ayushman, APY, SCSS
+- USA (4 schemes): Medicare, Social Security, SNAP, 401(k) Catch-Up
 """
 
 from datetime import date
@@ -20,10 +18,11 @@ def by_id(results, scheme_id):
 
 
 def test_catalog_has_eight_schemes():
-    schemes = load_schemes()
-    assert len(schemes) == 8
-    ids = {s["id"] for s in schemes}
-    expected = {
+    """Verify Indian catalog has 8 schemes and full catalog has 12 schemes."""
+    in_schemes = load_schemes(country="IN")
+    assert len(in_schemes) == 8
+    in_ids = {s["id"] for s in in_schemes}
+    expected_in = {
         "ignoaps_mh",
         "ayushman_vay_vandana",
         "apy",
@@ -33,7 +32,21 @@ def test_catalog_has_eight_schemes():
         "ssy",
         "pm_kisan",
     }
-    assert ids == expected
+    assert in_ids == expected_in
+
+    us_schemes = load_schemes(country="US")
+    assert len(us_schemes) == 4
+    us_ids = {s["id"] for s in us_schemes}
+    expected_us = {
+        "us_medicare",
+        "us_social_security",
+        "us_snap",
+        "us_catchup_401k",
+    }
+    assert us_ids == expected_us
+
+    all_schemes = load_schemes()
+    assert len(all_schemes) == 12
 
 
 def test_every_scheme_has_https_source_and_documents():
@@ -43,6 +56,7 @@ def test_every_scheme_has_https_source_and_documents():
         assert len(s["documents"]) >= 2
         assert s["summary"]
         assert s["state"]
+        assert s["country"] in ("IN", "US")
 
 
 class TestPMJJBY:
@@ -131,6 +145,71 @@ class TestPMKisan:
         assert r["status"] == "check_needed"
 
 
+class TestUSMedicare:
+    def test_senior_65_plus_eligible(self):
+        # Chandler (born 1950, age 76 in 2026)
+        res = check_eligibility(1950, set(), TODAY, country="US")
+        r = by_id(res, "us_medicare")
+        assert r["status"] == "may_be_eligible"
+
+    def test_age_63_almost_eligible(self):
+        # Age 63 (born 1963 in 2026, min_age 65, gap 2 years)
+        res = check_eligibility(1963, set(), TODAY, country="US")
+        r = by_id(res, "us_medicare")
+        assert r["status"] == "almost_eligible"
+        assert r["years_until_eligible"] == 2
+        assert r["eligible_from_year"] == 2028
+
+    def test_under_62_not_eligible(self):
+        # Justin (born 1968, age 58 in 2026, gap 7 years > 3)
+        res = check_eligibility(1968, set(), TODAY, country="US")
+        r = by_id(res, "us_medicare")
+        assert r["status"] == "not_eligible"
+
+
+class TestUSSocialSecurity:
+    def test_senior_62_plus_eligible(self):
+        # Age 65 (born 1961 in 2026)
+        res = check_eligibility(1961, set(), TODAY, country="US")
+        r = by_id(res, "us_social_security")
+        assert r["status"] == "may_be_eligible"
+
+    def test_age_60_almost_eligible(self):
+        # Age 60 (born 1966 in 2026, min_age 62, gap 2 years)
+        res = check_eligibility(1966, set(), TODAY, country="US")
+        r = by_id(res, "us_social_security")
+        assert r["status"] == "almost_eligible"
+        assert r["years_until_eligible"] == 2
+        assert r["eligible_from_year"] == 2028
+
+
+class TestUSSNAP:
+    def test_with_low_income_eligible(self):
+        res = check_eligibility(1990, {"low_income"}, TODAY, country="US")
+        r = by_id(res, "us_snap")
+        assert r["status"] == "may_be_eligible"
+
+    def test_without_tag_check_needed(self):
+        res = check_eligibility(1990, set(), TODAY, country="US")
+        r = by_id(res, "us_snap")
+        assert r["status"] == "check_needed"
+        assert "needs: low_income" in r["confirm"]
+
+
+class TestUSCatchup401k:
+    def test_age_50_plus_employed_eligible(self):
+        # Justin (born 1968, age 58 in 2026)
+        res = check_eligibility(1968, {"employed"}, TODAY, country="US")
+        r = by_id(res, "us_catchup_401k")
+        assert r["status"] == "may_be_eligible"
+
+    def test_under_50_not_eligible(self):
+        # Jace (born 2000, age 26 in 2026)
+        res = check_eligibility(2000, {"employed"}, TODAY, country="US")
+        r = by_id(res, "us_catchup_401k")
+        assert r["status"] == "not_eligible"
+
+
 def test_get_scheme_checklist_new_schemes():
     checklist_pmjjby = get_scheme_checklist("pmjjby")
     assert "Jeevan Jyoti" in checklist_pmjjby
@@ -143,3 +222,11 @@ def test_get_scheme_checklist_new_schemes():
     checklist_kisan = get_scheme_checklist("pm_kisan")
     assert "PM Kisan" in checklist_kisan
     assert "Khasra/Khatauni" in checklist_kisan
+
+    checklist_medicare = get_scheme_checklist("us_medicare")
+    assert "Medicare" in checklist_medicare
+    assert "CMS-40B" in checklist_medicare
+
+    checklist_ssa = get_scheme_checklist("us_social_security")
+    assert "Social Security" in checklist_ssa
+    assert "Birth Certificate" in checklist_ssa

@@ -373,7 +373,7 @@ def test_expiring_invalid_days_over_limit(db_conn):
 #   Tests follow the code.
 # ---------------------------------------------------------------------------
 
-from backend.tools import add_task, list_upcoming_tasks
+from backend.tools import add_task, list_upcoming_tasks, complete_task
 
 
 def _task_count(conn):
@@ -607,6 +607,17 @@ def test_check_scheme_eligibility_empty_name(db_conn):
     assert result == "Please provide a family member's name."
 
 
+def test_check_scheme_eligibility_us_country_filter(db_conn):
+    """US filter returns Medicare and Social Security for seniors, excluding Indian schemes."""
+    add_family_member("Chandler", "grandfather", 1950, "retired")
+    result = check_scheme_eligibility("Chandler", country="US")
+    assert "Medicare (Parts A & B)" in result
+    assert "Social Security Retirement Benefits" in result
+    assert "Ayushman" not in result
+    assert "Indira Gandhi" not in result
+
+
+
 def test_get_scheme_checklist_by_id(db_conn):
     """Fetch checklist by scheme ID."""
     result = get_scheme_checklist("ayushman_vay_vandana")
@@ -763,5 +774,71 @@ def test_get_family_dashboard_with_data(db_conn):
     assert "Renew passport" in result
     assert "--- BENEFIT OPPORTUNITIES ---" in result
     assert "Chandler qualifies for" in result
+
+
+# ---------------------------------------------------------------------------
+# complete_task — Task Completion
+# ---------------------------------------------------------------------------
+
+
+def test_complete_task_by_title_and_owner(db_conn):
+    """Marking a task completed by title and member name sets done=1 and confirms."""
+    add_family_member("Justin", "son", 1995, "working")
+    due = (_dt.date.today() + _dt.timedelta(days=14)).isoformat()
+    add_task("Vehicle insurance renewal check", due, "Justin")
+
+    res = complete_task(task_title="Vehicle insurance renewal check", member_name="Justin")
+    assert "Completed: 'Vehicle insurance renewal check' for Justin." in res
+
+    row = _get_task(db_conn, "Vehicle insurance renewal check")
+    assert row["done"] == 1
+
+
+def test_complete_task_fuzzy_match(db_conn):
+    """Fuzzy or substring matching correctly marks the matching task done."""
+    add_family_member("Justin", "son", 1995, "working")
+    due = (_dt.date.today() + _dt.timedelta(days=14)).isoformat()
+    add_task("Vehicle insurance renewal check", due, "Justin")
+
+    res = complete_task(task_title="insurance renewal", member_name="Justin")
+    assert "Completed: 'Vehicle insurance renewal check' for Justin." in res
+
+
+def test_complete_task_by_id(db_conn):
+    """Passing task_id directly marks that exact task done."""
+    due = (_dt.date.today() + _dt.timedelta(days=10)).isoformat()
+    add_task("Pay utility bill", due)
+    row = _get_task(db_conn, "Pay utility bill")
+
+    res = complete_task(task_id=row["id"])
+    assert "Completed: 'Pay utility bill'." in res
+
+    updated = _get_task(db_conn, "Pay utility bill")
+    assert updated["done"] == 1
+
+
+def test_complete_task_already_done(db_conn):
+    """Calling complete_task on an already completed task indicates it is already done."""
+    due = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    add_task("Pick up medicine", due)
+    row = _get_task(db_conn, "Pick up medicine")
+    complete_task(task_id=row["id"])
+
+    res = complete_task(task_title="Pick up medicine")
+    assert "already marked as completed" in res
+
+
+def test_complete_task_not_found_empty(db_conn):
+    """Calling complete_task with empty tasks table returns friendly message."""
+    res = complete_task(task_title="Nonexistent errand 12345")
+    assert "No pending tasks found." in res
+
+
+def test_complete_task_not_found_with_candidates(db_conn):
+    """Calling complete_task with no matching tasks returns friendly error."""
+    due = (_dt.date.today() + _dt.timedelta(days=5)).isoformat()
+    add_task("Pick up medicine", due)
+    res = complete_task(task_title="Nonexistent errand 12345")
+    assert "Couldn't find any pending task" in res
 
 
