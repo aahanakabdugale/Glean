@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: glean-mcp-server
+    runtime: python
+    buildCommand: pip install -r requirements.txt && python seed_demo_data.py
+    startCommand: python server.py
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: GLEAN_ALLOWED_ORIGINS
+        value: "*"
