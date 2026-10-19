@@ -15,6 +15,7 @@
       console.error('Failed to complete task', e);
     }
   }
+  $: validTasks = (Array.isArray(data) ? data : []).filter(t => t && (t.title || t.raw));
 </script>
 
 <div class="tasks-container" role="region" aria-label="Upcoming tasks">
@@ -23,11 +24,11 @@
     <span class="text-label uppercase">Upcoming Tasks</span>
   </div>
 
-  {#if !data || data.length === 0}
+  {#if !validTasks || validTasks.length === 0}
     <p class="empty-state text-body">No pending tasks found. All deadlines are clear.</p>
   {:else}
     <div class="task-list" role="list">
-      {#each data as task, i}
+      {#each validTasks as task, i}
         {@const level = task.overdue ? 'urgent' : urgencyOf(task.daysLeft)}
         <div class="vr-list-row {level}" class:done={checked[i]} role="listitem">
           <div class="task-left">
@@ -36,7 +37,7 @@
               class="check-circle"
               class:ticked={checked[i]}
               on:click={() => toggle(i, task)}
-              aria-label="{checked[i] ? 'Unmark' : 'Mark'} task: {task.title}"
+              aria-label="{checked[i] ? 'Unmark' : 'Mark'} task: {task.title || task.raw}"
               aria-pressed={checked[i]}
             >
               {#if checked[i]}
@@ -46,7 +47,7 @@
 
             <div class="task-details">
               <span class="task-title text-body" class:done={checked[i]}>
-                <strong>{task.title}</strong>
+                <strong>{task.title || task.raw || 'Pending Task'}</strong>
               </span>
               <div class="task-meta text-small">
                 {#if task.dueDate}
@@ -75,7 +76,7 @@
                 {:else}
                   <Clock size={12} />
                 {/if}
-                <span>{task.statusText || formatDaysLeft(task.daysLeft)}</span>
+                <span>{task.statusText || (task.daysLeft != null ? formatDaysLeft(task.daysLeft) : 'Upcoming')}</span>
               </span>
             {/if}
           </div>

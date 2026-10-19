@@ -11,6 +11,7 @@
   import SchemeChecklist from './results/SchemeChecklist.svelte';
   import PlanApplication from './results/PlanApplication.svelte';
   import UpcomingTasks from './results/UpcomingTasks.svelte';
+  import DocumentTracker from './results/DocumentTracker.svelte';
   import DependencyGraphDAG from './results/DependencyGraphDAG.svelte';
   import ConflictSimulatorDAG from './results/ConflictSimulatorDAG.svelte';
   import VoiceDialectsDAG from './results/VoiceDialectsDAG.svelte';
@@ -38,12 +39,42 @@
     return null;
   }
 
+  function extractDocTypeFromQuery(q) {
+    if (!q) return null;
+    const l = q.toLowerCase();
+    if (l.includes('passport')) return 'Passport';
+    if (l.includes('driving') || l.includes('license') || l.includes('licence')) return 'Driving Licence';
+    if (l.includes('health insurance') || l.includes('medical insurance')) return 'Health Insurance';
+    if (l.includes('vehicle insurance') || l.includes('motor vehicle') || l.includes('auto insurance')) return 'Vehicle Insurance';
+    if (l.includes('insurance')) return 'Insurance';
+    if (l.includes('pension')) return 'Pension Certificate';
+    if (l.includes('transit pass') || l.includes('transit')) return 'Transit Pass';
+    if (l.includes('certificate')) return 'Certificate';
+    return null;
+  }
+
   // Adapt general typed / spoken / quick-chip query results to Center Sheet structure
   function getGeneralSheetProps(assistantMsg, userMsg) {
     const query = userMsg?.text || 'Voice Query';
     const type = assistantMsg?.resultType;
     const data = assistantMsg?.resultData;
     const text = assistantMsg?.text || '';
+
+    if (type === 'document_tracker' && data) {
+      const counts = data.counts || { completed: 0, partial: 0, remaining: 0, total: 0 };
+      const person = data.target || extractPersonFromQuery(query);
+      const who = person && person !== 'Household' && person !== 'All Family Members' ? ` for ${person}` : '';
+      return {
+        query,
+        headline: `${counts.completed} completed, ${counts.partial} partial, and ${counts.remaining} remaining${who}.`,
+        accentWord: `${counts.completed} completed`,
+        chips: [
+          { label: `${counts.completed} Completed`, color: 'green' },
+          { label: `${counts.partial} Partial`, color: 'amber' },
+          { label: `${counts.remaining} Remaining`, color: 'red' }
+        ]
+      };
+    }
 
     if (type === 'scheme_eligibility' && data) {
       const person = data.personName || 'Chandler';
@@ -63,16 +94,35 @@
       const docsList = Array.isArray(data) ? data : (data.expiringDocs || data.docs || []);
       const count = docsList.length;
       const person = extractPersonFromQuery(query);
+      const docType = extractDocTypeFromQuery(query);
       const daysMatch = query.match(/(\d+)\s*days?/i);
       const days = daysMatch ? parseInt(daysMatch[1], 10) : 60;
-      const subject = person ? `documents for ${person}` : 'family documents';
-      const headline = count === 0
-        ? `No ${subject} expire within ${days} days.`
-        : `${count} ${subject} expire within ${days} days.`;
+
+      let headline = '';
+      let accentWord = '';
+
+      if (count === 1 && docsList[0]) {
+        const d = docsList[0];
+        const daysText = d.daysLeft !== undefined ? (d.daysLeft === 0 ? 'today' : `in ${d.daysLeft} days`) : 'soon';
+        headline = `${d.member}'s ${d.docType} expires ${daysText}.`;
+        accentWord = `${d.member}'s ${d.docType}`;
+      } else if (count === 0) {
+        const subject = docType
+          ? (person ? `${person}'s ${docType}` : docType)
+          : (person ? `documents for ${person}` : 'family documents');
+        headline = `No ${subject} expire within ${days} days.`;
+        accentWord = `No ${subject}`;
+      } else {
+        const noun = count === 1 ? 'document' : 'documents';
+        const subject = person ? `${noun} for ${person}` : `family ${noun}`;
+        headline = `${count} ${subject} expire within ${days} days.`;
+        accentWord = `${count} ${subject}`;
+      }
+
       return {
         query,
         headline,
-        accentWord: count === 0 ? `No ${subject}` : `${count} ${subject}`,
+        accentWord,
         chips: [{ label: `${count} expiring soon`, color: count > 0 ? 'amber' : 'green' }]
       };
     }
@@ -466,6 +516,8 @@
                 <PlanApplication data={lastAssistantMsg.resultData} />
               {:else if lastAssistantMsg.resultType === 'upcoming_tasks' && lastAssistantMsg.resultData}
                 <UpcomingTasks data={lastAssistantMsg.resultData} />
+              {:else if lastAssistantMsg.resultType === 'document_tracker' && lastAssistantMsg.resultData}
+                <DocumentTracker data={lastAssistantMsg.resultData} onAction={(cmd) => onSend(cmd)} />
               {:else}
                 <div class="general-text-response">
                   {#each (lastAssistantMsg.text || '').split('\n') as paragraph}

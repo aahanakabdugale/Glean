@@ -85,11 +85,13 @@
   --focus: #2f5bea;
   --logo-glow: rgba(59,111,245,.25);
 
-  /* Floating Bottom Navigation Dock Tokens (Light) */
-  --dock-bg: rgba(255,255,255,0.8);
+  /* Floating Navigation Dock & Header Bar Tokens (Light) */
+  --top-bar-bg: rgba(255, 255, 255, 0.98);
+  --dock-bg: #ffffff;
   --dock-border: #d6e0f0;
   --dock-text: #5b6b82;
   --dock-active-bg: #e3edff;
+  --dock-active-text: #1d4ed8;
   --muted: #6b7a90;
 
   /* Protocol Traces View Tokens (Light) */
@@ -189,11 +191,13 @@
   --focus: #3a58a8;
   --logo-glow: rgba(59,111,245,.20);
 
-  /* Floating Bottom Navigation Dock Tokens (Dark) */
-  --dock-bg: rgba(15,26,43,0.8);
+  /* Floating Navigation Dock & Header Bar Tokens (Dark) */
+  --top-bar-bg: rgba(8, 14, 24, 0.98);
+  --dock-bg: #0f1a2b;
   --dock-border: #24405f;
   --dock-text: #8ea3bd;
   --dock-active-bg: #0d3a4d;
+  --dock-active-text: #19c3ff;
   --muted: #6a7f99;
 
   /* Protocol Traces View Tokens (Dark) */

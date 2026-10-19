@@ -212,3 +212,6 @@ export function pushAmbientAlert(alert) {
   ambientAlertHistory.update(list => [alert, ...list].slice(0, 20));
 }
 
+// ---------- SUGGESTED ACTIONS SIDE DRAWER -------------------
+export const showSuggestedActions = writable(false);
+

@@ -1,10 +1,8 @@
 <script>
-  import { activePersona } from '../lib/store.js';
-  import { ChevronDown } from '@lucide/svelte';
+  import { activePersona, showSuggestedActions } from '../lib/store.js';
+  import { ChevronRight } from '@lucide/svelte';
 
   export let onChipClick = (/** @type {string} */ _text) => {};
-
-  let showMore = false;
 
   $: elder = $activePersona && ['chandler', 'amy', 'justin'].includes($activePersona.toLowerCase())
     ? $activePersona
@@ -13,19 +11,6 @@
   $: primaryPills = [
     { label: 'What is expiring soon?', prompt: 'What documents are expiring in the next 60 days?' },
     { label: `Check schemes for ${elder}`, prompt: `What schemes does ${elder} qualify for?` },
-  ];
-
-  $: morePills = [
-    { label: `Plan SCSS for ${elder}`, prompt: `Plan the SCSS application for ${elder}` },
-    { label: 'Check US Medicare for Chandler', prompt: 'Check US Medicare eligibility for Chandler' },
-    { label: 'Social Security for Chandler', prompt: 'Check Social Security retirement eligibility for Chandler' },
-    { label: 'Morning briefing', prompt: $activePersona && $activePersona !== 'all' ? `Give me the morning briefing for ${$activePersona}` : 'Give me the full family briefing' },
-    { label: 'Annual family review', prompt: 'Run the annual family review' },
-    { label: 'Ayushman checklist', prompt: 'What documents are needed for Ayushman Vay Vandana?' },
-    { label: 'Medicare checklist', prompt: 'What documents are needed for Medicare?' },
-    { label: 'Family roster', prompt: 'List all family members' },
-    { label: 'Tasks in next 30 days', prompt: 'What tasks are coming up in the next 30 days?' },
-    { label: 'Family dashboard', prompt: 'Show me the family dashboard' },
   ];
 </script>
 
@@ -41,33 +26,19 @@
       </button>
     {/each}
 
-    <!-- "More Actions" popover / dropdown button -->
+    <!-- "More Actions" button (clean text, no sparkle, opens root side banner) -->
     <button
       type="button"
       class="vr-pill more-btn"
-      class:active={showMore}
-      on:click={() => (showMore = !showMore)}
-      aria-expanded={showMore}
-      aria-label="More suggested actions"
+      class:active={$showSuggestedActions}
+      on:click={() => showSuggestedActions.set(true)}
+      aria-expanded={$showSuggestedActions}
+      aria-label="Open suggested actions side banner"
     >
       <span>More Actions</span>
-      <ChevronDown size={14} class="chevron {showMore ? 'open' : ''}" />
+      <ChevronRight size={14} class="more-arrow" />
     </button>
   </div>
-
-  {#if showMore}
-    <div class="more-drawer">
-      {#each morePills as pill}
-        <button
-          type="button"
-          class="vr-pill secondary"
-          on:click={() => { onChipClick(pill.prompt); showMore = false; }}
-        >
-          <span>{pill.label}</span>
-        </button>
-      {/each}
-    </div>
-  {/if}
 </div>
 
 <style>
@@ -88,41 +59,23 @@
   }
 
   .more-btn {
-    color: var(--text-muted);
+    color: var(--text-soft);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
   }
-  .more-btn.active {
+  .more-btn.active,
+  .more-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
     background: var(--surface-2);
   }
 
-  .chevron {
+  .more-arrow {
     transition: transform var(--dur-fast) var(--ease);
   }
-  .chevron.open {
-    transform: rotate(180deg);
-  }
-
-  .more-drawer {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--sp-8);
-    padding: var(--sp-8);
-    background: var(--surface-2);
-    border: 1px solid var(--line-soft);
-    border-radius: var(--r-card);
-    box-shadow: var(--shadow-card);
-    animation: fade-down 150ms var(--ease);
-  }
-
-  .vr-pill.secondary {
-    background: var(--surface);
-    font-size: var(--fs-label);
-  }
-
-  @keyframes fade-down {
-    from { opacity: 0; transform: translateY(-4px); }
-    to { opacity: 1; transform: translateY(0); }
+  .more-btn:hover .more-arrow {
+    transform: translateX(2px);
   }
 </style>

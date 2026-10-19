@@ -441,7 +441,7 @@
           >
             <div class="row-main">
               <div class="row-title">
-                <span class="region-pill">{s.countryLabel}</span>
+                <span class="region-pill {s.country === 'IN' ? 'region-pill-in' : ''}">{s.countryLabel}</span>
                 <span class="title-bold">{s.title}</span>
                 <span class="title-sep">·</span>
                 <span class="title-target">{s.beneficiary}</span>

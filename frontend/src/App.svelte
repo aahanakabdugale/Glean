@@ -7,10 +7,12 @@
   import VoiceScreen   from './components/VoiceScreen.svelte';
   import SettingsPanel from './components/SettingsPanel.svelte';
   import DashboardView from './components/DashboardView.svelte';
+  import DocumentTrackerView from './components/DocumentTrackerView.svelte';
   import TracesView    from './components/TracesView.svelte';
+  import SuggestedActionsDrawer from './components/SuggestedActionsDrawer.svelte';
 
   import { onMount } from 'svelte';
-  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, activeJurisdiction, familyMembersList, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert, alexaMicEnabled } from './lib/store.js';
+  import { activeView, orbState, settings, addMessage, updateLastMessage, activePersona, activeJurisdiction, familyMembersList, activeAmbientAlert, pushAmbientAlert, dismissAmbientAlert, alexaMicEnabled, showSuggestedActions } from './lib/store.js';
   import * as mcp from './lib/mcp.js';
   import { cleanTextForSpeech } from './lib/speech.js';
 
@@ -157,13 +159,29 @@
         result = await mcp.callExplainForGeneration(scheme, persona);
         result.toolName = 'explain_for_generation';
         result.toolArgs = { scheme_id: scheme, target_persona: persona };
+      } else if (
+        q.includes('track') ||
+        q.includes('progress') ||
+        (q.includes('document') && (q.includes('done') || q.includes('status') || q.includes('remaining') || q.includes('partial') || q.includes('how many'))) ||
+        (q.includes('how many') && (q.includes('done') || q.includes('remaining') || q.includes('partial') || q.includes('task'))) ||
+        (q.includes('completed') && (q.includes('remaining') || q.includes('partial')))
+      ) {
+        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        result = await mcp.callGetDocumentTracker(person);
+        result.toolName = 'get_document_tracker';
+        result.toolArgs = person ? { member_name: person } : {};
       } else if (q.includes('expir') || (q.includes('document') && (q.includes('soon') || q.includes('renew')))) {
         const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        const docType = extractDocType(q);
         const daysMatch = q.match(/(\d+)\s*days?/i);
-        const days = daysMatch ? parseInt(daysMatch[1], 10) : 60;
-        result = await mcp.callGetExpiringDocuments(days, person);
+        const days = daysMatch ? parseInt(daysMatch[1], 10) : (docType ? 90 : 60);
+        result = await mcp.callGetExpiringDocuments(days, person, docType);
         result.toolName = 'get_expiring_documents';
-        result.toolArgs = person ? { days, member_name: person } : { days };
+        result.toolArgs = {
+          days,
+          ...(person ? { member_name: person } : {}),
+          ...(docType ? { doc_type: docType } : {})
+        };
       } else if (q.includes('plan') || (q.includes('apply') && q.includes('for'))) {
         const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : 'Chandler');
         const scheme = extractScheme(q) || 'scss';
@@ -195,7 +213,8 @@
         result.toolName = 'complete_task';
         result.toolArgs = { task_title: taskTitle, member_name: person };
       } else if (q.includes('task') || q.includes('deadline') || q.includes('upcoming')) {
-        const person = extractPerson(q) || ($activePersona !== 'all' ? $activePersona : '');
+        const explicitPerson = extractPerson(q);
+        const person = explicitPerson || '';
         const daysMatch = q.match(/(\d+)\s*days?/i);
         const days = daysMatch ? parseInt(daysMatch[1], 10) : 30;
         result = await mcp.callListUpcomingTasks(days, person);
@@ -282,6 +301,20 @@
       ?.replace(/^./, c => c.toUpperCase()) ?? null;
   }
 
+  function extractDocType(q) {
+    if (!q) return '';
+    const l = q.toLowerCase();
+    if (l.includes('passport')) return 'Passport';
+    if (l.includes('driving') || l.includes('license') || l.includes('licence')) return 'Driving Licence';
+    if (l.includes('health insurance') || l.includes('medical insurance')) return 'Health Insurance';
+    if (l.includes('vehicle insurance') || l.includes('motor vehicle') || l.includes('auto insurance')) return 'Vehicle Insurance';
+    if (l.includes('insurance')) return 'Insurance';
+    if (l.includes('pension')) return 'Pension Certificate';
+    if (l.includes('transit pass') || l.includes('transit')) return 'Transit Pass';
+    if (l.includes('certificate')) return 'Certificate';
+    return '';
+  }
+
   function extractTaskTitle(q) {
     let clean = q;
     // Strip common phrases
@@ -318,7 +351,7 @@
   {#if $activeAmbientAlert}
     <aside class="ambient-push-card" role="alert" aria-live="assertive">
       <div class="ambient-push-header">
-        <span class="ambient-push-badge">⚡ URGENT ALERT</span>
+        <span class="ambient-push-badge">URGENT ALERT</span>
         <button
           type="button"
           class="ambient-dismiss-btn"
@@ -341,7 +374,27 @@
           type="button"
           class="ambient-action-btn"
           on:click={() => {
-            const prompt = $activeAmbientAlert.suggested_action || 'What documents are expiring soon?';
+            const alert = $activeAmbientAlert;
+            const member = alert?.member;
+            const docType = alert?.doc_type;
+            let prompt = alert?.suggested_action || alert?.prompt;
+
+            if (!prompt) {
+              if (docType && member && member !== 'Household') {
+                prompt = `Check expiring ${docType} for ${member}`;
+              } else if (member && member !== 'Household') {
+                prompt = `What documents are expiring soon for ${member}?`;
+              } else {
+                prompt = 'What documents are expiring soon?';
+              }
+            }
+
+            if (member && member !== 'Household') {
+              activePersona.set(member);
+            }
+            if ($activeView !== 'chat') {
+              activeView.set('chat');
+            }
             dismissAmbientAlert();
             handleSend(prompt);
           }}
@@ -358,12 +411,19 @@
       <SettingsPanel />
     {:else if $activeView === 'dashboard'}
       <DashboardView onAction={(prompt) => { activeView.set('chat'); handleSend(prompt); }} />
+    {:else if $activeView === 'tracker'}
+      <DocumentTrackerView onAction={(prompt) => { activeView.set('chat'); handleSend(prompt); }} />
     {:else if $activeView === 'traces'}
       <TracesView />
     {:else}
       <VoiceScreen onSend={handleSend} />
     {/if}
   </main>
+ 
+  <!-- Suggested Actions Side Banner: mounted at root level, completely in front of Header & chips -->
+  {#if $showSuggestedActions}
+    <SuggestedActionsDrawer onAction={(prompt) => { activeView.set('chat'); handleSend(prompt); }} />
+  {/if}
 </div>
 
 <style>
@@ -413,17 +473,16 @@
   }
 
   /* Ambient Proactive Push Card (Bottom-Right Floating Square Box) */
+  /* Ambient Proactive Push Card (Bottom-Right Floating Square Box - Fully Opaque) */
   .ambient-push-card {
     position: fixed;
     right: 24px;
     bottom: 24px;
     width: 310px;
-    background: var(--surface, #ffffff);
-    background: linear-gradient(160deg, rgba(239, 68, 68, 0.08) 0%, var(--surface, #ffffff) 55%);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: #ffffff;
+    background: linear-gradient(160deg, #fff5f5 0%, #ffffff 50%);
     border: 1.5px solid rgba(239, 68, 68, 0.45);
-    box-shadow: 0 12px 36px rgba(239, 68, 68, 0.22), 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 12px 36px rgba(239, 68, 68, 0.18), 0 4px 16px rgba(0, 0, 0, 0.12);
     border-radius: 18px;
     padding: 16px;
     display: flex;
@@ -434,9 +493,10 @@
   }
 
   :global([data-theme="dark"]) .ambient-push-card {
-    background: linear-gradient(160deg, rgba(239, 68, 68, 0.16) 0%, rgba(20, 10, 15, 0.95) 60%);
+    background: #140d12;
+    background: linear-gradient(160deg, #241217 0%, #121824 55%);
     border: 1.5px solid rgba(239, 68, 68, 0.55);
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 24px rgba(239, 68, 68, 0.25);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(239, 68, 68, 0.25);
   }
 
   @keyframes ambient-pop-up {
@@ -461,8 +521,8 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: rgba(239, 68, 68, 0.16);
-    color: #ef4444;
+    background: #fee2e2;
+    color: #dc2626;
     border: 1px solid rgba(239, 68, 68, 0.35);
     padding: 3px 8px;
     border-radius: 999px;
@@ -470,6 +530,12 @@
     font-weight: 700;
     letter-spacing: 0.05em;
     text-transform: uppercase;
+  }
+
+  :global([data-theme="dark"]) .ambient-push-badge {
+    background: #3b181c;
+    color: #f87171;
+    border: 1px solid rgba(239, 68, 68, 0.45);
   }
 
   .ambient-dismiss-btn {

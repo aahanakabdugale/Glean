@@ -194,12 +194,16 @@ export async function callFamilyBrief(memberName = '') {
   };
 }
 
-export async function callGetExpiringDocuments(days = 30, memberName = '') {
+export async function callGetExpiringDocuments(days = 30, memberName = '', docType = '') {
   const args = { days };
   if (memberName && memberName !== 'all') args.member_name = memberName;
+  if (docType) args.doc_type = docType;
   const raw = await callTool('get_expiring_documents', args);
   if (raw.ok) {
-    const parsed = parseExpiringDocs(raw.text);
+    let parsed = parseExpiringDocs(raw.text);
+    if (docType) {
+      parsed = parsed.filter(d => (d.docType || '').toLowerCase().includes(docType.toLowerCase()));
+    }
     return {
       ...raw,
       resultType: 'expiring_docs',
@@ -208,12 +212,15 @@ export async function callGetExpiringDocuments(days = 30, memberName = '') {
     };
   }
   const demo = demoExpiringDocs();
-  const filtered = memberName && memberName !== 'all'
+  let filtered = memberName && memberName !== 'all'
     ? demo.data.filter(d => d.member.toLowerCase() === memberName.toLowerCase())
     : demo.data;
+  if (docType) {
+    filtered = filtered.filter(d => (d.docType || '').toLowerCase().includes(docType.toLowerCase()));
+  }
   return {
     ok: true,
-    text: demo.text,
+    text: filtered.length ? filtered.map(d => `${d.member}'s ${d.docType} - ${d.expiryDate} (${d.statusText})`).join('\n') : demo.text,
     isLive: false,
     ms: 0,
     resultType: 'expiring_docs',
@@ -241,12 +248,37 @@ export async function callListUpcomingTasks(days = 30, memberName = '') {
     : demo.data;
   return {
     ok: true,
-    text: demo.text,
+    text: filtered.length ? filtered.map(t => `${t.title} (${t.member}) - ${t.dueDate} (${t.statusText})`).join('\n') : demo.text,
     isLive: false,
     ms: 0,
     resultType: 'upcoming_tasks',
     resultData: filtered,
     spokenText: generateTasksSpokenBrief(filtered, days)
+  };
+}
+
+export async function callGetDocumentTracker(memberName = '') {
+  const args = {};
+  if (memberName && memberName !== 'all') args.member_name = memberName;
+  const raw = await callTool('get_document_tracker', args);
+  if (raw.ok) {
+    const parsed = parseDocumentTracker(raw.text, memberName);
+    return {
+      ...raw,
+      resultType: 'document_tracker',
+      resultData: parsed,
+      spokenText: parsed.spokenText
+    };
+  }
+  const demo = demoDocumentTracker(memberName);
+  return {
+    ok: true,
+    text: demo.text,
+    isLive: false,
+    ms: 0,
+    resultType: 'document_tracker',
+    resultData: demo.data,
+    spokenText: demo.data.spokenText
   };
 }
 
@@ -505,20 +537,39 @@ function parseExpiringDocs(text) {
 }
 
 function parseUpcomingTasks(text) {
+  if (!text || /no tasks (due|found|pending)/i.test(text) || /no pending tasks/i.test(text) || /couldn't find/i.test(text)) {
+    return [];
+  }
   const seen = new Set();
   const tasks = [];
-  for (const line of text.split('\n').filter(Boolean)) {
-    const m = line.match(/^(.+?)(?: \((.+?)\))? - (\d{4}-\d{2}-\d{2}) \((.+?)\)/);
-    if (!m) {
-      tasks.push({ raw: line });
+  for (const line of text.split('\n').map(l => l.trim()).filter(Boolean)) {
+    if (/no tasks (due|found|pending)/i.test(line) || /no pending tasks/i.test(line) || /couldn't find/i.test(line)) {
       continue;
     }
-    const [, title, member, dueDate, statusText] = m;
-    const key = `${title.trim().toLowerCase()}_${(member || '').trim().toLowerCase()}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      const overdue = statusText.startsWith('OVERDUE');
-      tasks.push({ title, member: member || null, dueDate, statusText, overdue });
+    const m = line.match(/^(.+?)(?: \((.+?)\))? - (\d{4}-\d{2}-\d{2}) \((.+?)\)/);
+    if (m) {
+      const [, title, member, dueDate, statusText] = m;
+      const key = `${title.trim().toLowerCase()}_${(member || '').trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        const overdue = statusText.startsWith('OVERDUE');
+        tasks.push({ title: title.trim(), member: member || null, dueDate, statusText, overdue });
+      }
+    } else {
+      const clean = line.replace(/^[•\-\*\d\.]+\s*/, '').trim();
+      if (clean && !/no tasks/i.test(clean)) {
+        const cleanKey = clean.toLowerCase();
+        if (!seen.has(cleanKey)) {
+          seen.add(cleanKey);
+          tasks.push({
+            title: clean,
+            member: null,
+            dueDate: null,
+            statusText: 'Upcoming',
+            overdue: false
+          });
+        }
+      }
     }
   }
   return tasks;
@@ -604,6 +655,127 @@ function parseFamilyMembers(text) {
     const [, name, relation, birthYear, status] = m;
     return { name, relation, birthYear: parseInt(birthYear), status };
   });
+}
+
+export function parseDocumentTracker(text, memberName = '') {
+  let completed = 0;
+  let partial = 0;
+  let remaining = 0;
+  let target = memberName && memberName !== 'all' ? memberName : 'Household';
+  let spokenText = '';
+
+  const targetMatch = text.match(/Target:\s*(.+)/i);
+  if (targetMatch && targetMatch[1].trim() !== 'All Family Members') {
+    target = targetMatch[1].trim();
+  }
+
+  const sumMatch = text.match(/Summary:\s*(\d+)\s+completed,\s*(\d+)\s+partial,\s*(\d+)\s+remaining/i);
+  if (sumMatch) {
+    completed = parseInt(sumMatch[1], 10);
+    partial = parseInt(sumMatch[2], 10);
+    remaining = parseInt(sumMatch[3], 10);
+  }
+
+  const spokenMatch = text.match(/Spoken Brief:\s*(.+)/i);
+  if (spokenMatch) {
+    spokenText = spokenMatch[1].trim();
+  } else {
+    const prefix = target && target !== 'Household' ? `For ${target}: ` : 'Paperwork status: ';
+    spokenText = `${prefix}${completed} completed, ${partial} partial, and ${remaining} remaining.`;
+  }
+
+  const items = [];
+  const lines = text.split('\n');
+  let idCounter = 1;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const itemMatch = trimmed.match(/^-\s*\[(COMPLETED|PARTIAL|REMAINING)\]\s*\[([^\]]+)\]\s*\((Doc|Task)\)\s*(.+?)\s*-\s*(.+)$/i);
+    if (itemMatch) {
+      const statusRaw = itemMatch[1].toLowerCase();
+      const mem = itemMatch[2].trim();
+      const cat = itemMatch[3].toLowerCase() === 'doc' ? 'document' : 'task';
+      const title = itemMatch[4].trim();
+      const statusLabel = itemMatch[5].trim();
+      const actionPrompt = cat === 'document'
+        ? `Check expiring ${title} for ${mem}`
+        : (statusRaw === 'remaining' ? `I have completed ${title} for ${mem}` : `What tasks are coming up for ${mem}?`);
+
+      items.push({
+        id: `item-${idCounter++}`,
+        status: statusRaw,
+        member: mem,
+        category: cat,
+        title,
+        statusLabel,
+        actionPrompt
+      });
+    }
+  }
+
+  const seenItems = new Set();
+  const dedupedItems = [];
+  for (const it of items) {
+    const key = `${it.category}:${(it.member || '').toLowerCase()}:${(it.title || '').toLowerCase()}:${it.status}`;
+    if (!seenItems.has(key)) {
+      seenItems.add(key);
+      dedupedItems.push(it);
+    }
+  }
+
+  const cCount = dedupedItems.filter(i => i.status === 'completed').length;
+  const pCount = dedupedItems.filter(i => i.status === 'partial').length;
+  const rCount = dedupedItems.filter(i => i.status === 'remaining').length;
+
+  return {
+    target,
+    spokenText,
+    counts: {
+      completed: cCount,
+      partial: pCount,
+      remaining: rCount,
+      total: cCount + pCount + rCount
+    },
+    items: dedupedItems
+  };
+}
+
+function demoDocumentTracker(memberName = '') {
+  const member = memberName && memberName !== 'all' ? memberName : 'Household';
+  const allItems = [
+    { id: '1', member: 'Chandler', category: 'document', title: 'Fixed Deposit Scheme Certificate', status: 'completed', statusLabel: 'Valid (180d left)', actionPrompt: 'Check expiring Fixed Deposit Scheme Certificate for Chandler' },
+    { id: '2', member: 'Chandler', category: 'document', title: 'Passport', status: 'partial', statusLabel: 'Expires in 6d', actionPrompt: 'Check expiring Passport for Chandler' },
+    { id: '3', member: 'Chandler', category: 'document', title: 'Senior Citizen Health Insurance', status: 'partial', statusLabel: 'Expires in 25d', actionPrompt: 'Check expiring Senior Citizen Health Insurance for Chandler' },
+    { id: '4', member: 'Chandler', category: 'task', title: "Renew Chandler's passport appointment", status: 'remaining', statusLabel: 'Due in 4d', actionPrompt: "I have completed Renew Chandler's passport appointment for Chandler" },
+    { id: '5', member: 'Amy', category: 'document', title: 'Ayushman Vay Vandana Health Card', status: 'completed', statusLabel: 'Valid (365d left)', actionPrompt: 'Check expiring Ayushman Vay Vandana Health Card for Amy' },
+    { id: '6', member: 'Amy', category: 'document', title: 'Pension Life Verification Certificate', status: 'partial', statusLabel: 'Expires in 18d', actionPrompt: 'Check expiring Pension Life Verification Certificate for Amy' },
+    { id: '7', member: 'Justin', category: 'document', title: 'Motor Vehicle Comprehensive Insurance', status: 'partial', statusLabel: 'Expires in 12d', actionPrompt: 'Check expiring Motor Vehicle Comprehensive Insurance for Justin' },
+    { id: '8', member: 'Justin', category: 'document', title: 'Driving Licence', status: 'partial', statusLabel: 'Expires in 22d', actionPrompt: 'Check expiring Driving Licence for Justin' },
+    { id: '9', member: 'Justin', category: 'document', title: 'Passport', status: 'completed', statusLabel: 'Valid (750d left)', actionPrompt: 'Check expiring Passport for Justin' },
+    { id: '10', member: 'Riley', category: 'document', title: 'Health Insurance Policy', status: 'partial', statusLabel: 'Expires in 28d', actionPrompt: 'Check expiring Health Insurance Policy for Riley' },
+  ];
+
+  const items = memberName && memberName !== 'all'
+    ? allItems.filter(i => i.member.toLowerCase() === memberName.toLowerCase())
+    : allItems;
+
+  const completed = items.filter(i => i.status === 'completed').length;
+  const partial = items.filter(i => i.status === 'partial').length;
+  const remaining = items.filter(i => i.status === 'remaining').length;
+  const total = items.length;
+
+  const prefix = memberName && memberName !== 'all' ? `For ${memberName}: ` : 'Paperwork status: ';
+  const spokenText = `${prefix}${completed} completed, ${partial} partial, and ${remaining} remaining.`;
+
+  return {
+    text: `${spokenText}\nTotal: ${total}`,
+    data: {
+      target: member,
+      spokenText,
+      counts: { completed, partial, remaining, total },
+      items
+    }
+  };
 }
 
 // ---------- Demo data (shown when server is offline) ------

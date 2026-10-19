@@ -1,4 +1,5 @@
 <script>
+  import { onMount } from 'svelte';
   import {
     theme,
     toggleTheme,
@@ -14,6 +15,7 @@
   } from '../lib/store.js';
   import {
     LayoutGrid,
+    ClipboardCheck,
     Activity,
     SlidersHorizontal,
     Mic,
@@ -82,6 +84,34 @@
     }
   }
 
+  let isScrolled = false;
+
+  function updateScroll() {
+    const winScroll = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+    const appEl = typeof document !== 'undefined' ? document.querySelector('.app-layout') : null;
+    const appScroll = appEl ? appEl.scrollTop : 0;
+    isScrolled = winScroll > 6 || appScroll > 6;
+  }
+
+  onMount(() => {
+    updateScroll();
+    window.addEventListener('scroll', updateScroll, { passive: true });
+    const appEl = document.querySelector('.app-layout');
+    if (appEl) {
+      appEl.addEventListener('scroll', updateScroll, { passive: true });
+    }
+    return () => {
+      window.removeEventListener('scroll', updateScroll);
+      if (appEl) {
+        appEl.removeEventListener('scroll', updateScroll);
+      }
+    };
+  });
+
+  $: if ($activeView) {
+    setTimeout(updateScroll, 50);
+  }
+
   function handleKeydown(e) {
     if (e.key === 'Escape') {
       if (showUserMenu) showUserMenu = false;
@@ -93,7 +123,12 @@
 
 <svelte:window on:keydown={handleKeydown} />
 
-<header class="top-strip" aria-label="Glean simulator top navigation">
+<header
+  class="top-strip"
+  class:scrolled={isScrolled}
+  class:data-view={$activeView !== 'chat'}
+  aria-label="Glean simulator top navigation"
+>
   <!-- LEFT: Brand Orb + Wordmark -->
   <div class="col-left">
     <a
@@ -130,24 +165,34 @@
         <span class="dock-label">Dashboard</span>
       </button>
 
-      <!-- 2. Traces -->
+      <!-- 2. Document Tracker -->
+      <button
+        type="button"
+        class="dock-item"
+        class:active={$activeView === 'tracker'}
+        on:click={() => activeView.update(v => v === 'tracker' ? 'chat' : 'tracker')}
+        aria-label={$activeView === 'tracker' ? 'Close Document Tracker' : 'Open Document Tracker'}
+        aria-pressed={$activeView === 'tracker'}
+      >
+        <span class="dock-icon-wrap" aria-hidden="true">
+          <ClipboardCheck size={16} strokeWidth={1.75} />
+        </span>
+        <span class="dock-label">Tracker</span>
+      </button>
+
+      <!-- 3. Traces -->
       <button
         type="button"
         class="dock-item"
         class:active={$activeView === 'traces'}
         on:click={() => activeView.update(v => v === 'traces' ? 'chat' : 'traces')}
-        aria-label={$activeView === 'traces' ? 'Close Protocol Traces' : 'Open Protocol Traces'}
+        aria-label={$activeView === 'traces' ? 'Close Protocol Traces' : ($toolCallTraces.length > 0 ? `Open Protocol Traces (${$toolCallTraces.length} recorded)` : 'Open Protocol Traces')}
         aria-pressed={$activeView === 'traces'}
       >
         <span class="dock-icon-wrap" aria-hidden="true">
           <Activity size={16} strokeWidth={1.75} />
-          {#if $toolCallTraces.length > 0}
-            <span class="dock-badge" aria-label="{$toolCallTraces.length} traces">
-              {$toolCallTraces.length}
-            </span>
-          {/if}
         </span>
-        <span class="dock-label">Traces</span>
+        <span class="dock-label">Traces{#if $toolCallTraces.length > 0}<span class="dock-count">({$toolCallTraces.length})</span>{/if}</span>
       </button>
 
       <!-- 3. Settings -->
@@ -552,27 +597,46 @@
 </header>
 
 <style>
-  /* ================= TOP STRIP (Minimal, transparent, no full-width bar) ================= */
+  /* ================= TOP STRIP (Sticky Header with Opaque/Frosted Scroll Protection) ================= */
   .top-strip {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     width: 100%;
-    padding: 14px 20px;
+    padding: 12px 20px;
     background: transparent;
-    border: none;
+    border-bottom: 1px solid transparent;
     box-shadow: none;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    z-index: 40;
+    z-index: 60;
     box-sizing: border-box;
     font-family: 'Outfit', 'Outfit Variable', system-ui, -apple-system, sans-serif;
     font-size: 13px;
     font-weight: 500;
     color: var(--bar-text, var(--text));
-    pointer-events: none;
+    pointer-events: auto;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, padding 0.2s ease;
+  }
+
+  /* Scrolled or inside Data Views (Dashboard, Traces, Settings) */
+  .top-strip.scrolled,
+  .top-strip.data-view {
+    background: var(--top-bar-bg, rgba(255, 255, 255, 0.98));
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--dock-border);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    padding: 10px 20px;
+  }
+
+  :global([data-theme="dark"]) .top-strip.scrolled,
+  :global([data-theme="dark"]) .top-strip.data-view {
+    background: var(--top-bar-bg, rgba(8, 14, 24, 0.98));
+    border-bottom: 1px solid var(--dock-border);
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -623,7 +687,7 @@
     pointer-events: auto;
     position: absolute;
     top: 50%;
-    left: 50%;
+    left: calc(50% - 75px);
     transform: translate(-50%, -50%);
     display: flex;
     align-items: center;
@@ -714,28 +778,21 @@
     line-height: 1;
   }
 
-  /* Traces Count Badge */
-  .dock-badge {
-    position: absolute;
-    top: -5px;
-    right: -8px;
-    min-width: 16px;
-    height: 16px;
-    padding: 0 3.5px;
-    border-radius: 999px;
-    background: var(--dock-active-text);
-    color: var(--dock-active-bg);
-    font-size: 10.5px;
+  /* Traces Count Beside Label */
+  .dock-count {
+    margin-left: 2px;
+    font-size: 11.5px;
     font-weight: 700;
-    line-height: 16px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    color: var(--dock-active-text, #19c3ff);
+    letter-spacing: -0.2px;
   }
 
-  .dock-item.active .dock-badge {
-    background: var(--dock-active-text);
-    color: var(--dock-active-bg);
+  :global([data-theme="light"]) .dock-count {
+    color: var(--dock-active-text, #1d4ed8);
+  }
+
+  .dock-item.active .dock-count {
+    color: var(--dock-active-text);
   }
 
   /* ---------------- COLUMN RIGHT: Live Status, User Switcher, Theme Toggle ---------------- */
@@ -1310,6 +1367,9 @@
 
   /* ---------------- RESPONSIVE BREAKPOINT ---------------- */
   @media (max-width: 960px) {
+    .col-center {
+      left: calc(50% - 35px);
+    }
     .user-role,
     .user-sep {
       display: none;
@@ -1317,6 +1377,9 @@
   }
 
   @media (max-width: 820px) {
+    .col-center {
+      left: 50%;
+    }
     .dock-label {
       display: none;
     }
