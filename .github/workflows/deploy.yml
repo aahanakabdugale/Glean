@@ -1,0 +1,72 @@
+name: CI & Deploy to Render
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch: # Allows manual trigger from GitHub Actions UI
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Step 1: Run Test Suite (CI)
+  # ---------------------------------------------------------------------------
+  test:
+    name: Run Pytest Suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Seed Database
+        run: |
+          python seed_demo_data.py
+
+      - name: Run Pytest
+        run: |
+          pytest -v
+
+  # ---------------------------------------------------------------------------
+  # Step 2: Trigger Render Deployment (CD) - only runs on 'main' if tests pass
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to Render
+    needs: test
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Render Webhook
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::warning ::RENDER_DEPLOY_HOOK_URL secret is not set yet. Skipping automatic deploy trigger."
+            echo "To enable automatic deploy, add RENDER_DEPLOY_HOOK_URL to your GitHub repository secrets."
+            exit 0
+          fi
+
+          echo "Triggering Render deploy hook..."
+          HTTP_STATUS=$(curl -s -o response.txt -w "%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+          echo "Render response code: $HTTP_STATUS"
+          cat response.txt
+
+          if [ "$HTTP_STATUS" -ge 200 ] && [ "$HTTP_STATUS" -lt 300 ]; then
+            echo "Render deployment triggered successfully!"
+          else
+            echo "Failed to trigger Render deployment."
+            exit 1
+          fi
