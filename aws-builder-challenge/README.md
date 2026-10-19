@@ -25,6 +25,9 @@ every tool function had a spec to implement against, and tests had a spec to
 verify against. It reduced the number of mid-session clarifications I had to
 make.
 
+![Kiro Crew Workspace & Sessions](images/kiro_crew_1_session_view.png)
+![Kiro Spec Chat & Task Breakdown](images/kiro_crew_3_chat_section.png)
+
 ---
 
 ## 3. Use 2: Parallel Subagents for Tests and Docs
@@ -45,11 +48,15 @@ Total test count before Crew sessions: **53 tests** (45 in `test_tools.py` + 8 i
 `test_schemes.py`). After Crew wrote `test_schemes_extra.py` (20 new tests), the
 total rose to **73 tests** — all passing (confirmed with `pytest --tb=no -q`).
 
+![Kiro CLI in Terminal](images/kiro_crew_2_cli_.png)
+
 ---
 
 ## 4. Use 3: Persistent Memory Across Sessions
 
 Crew carries context between sessions via its dashboard DM thread.
+
+![Kiro Session Usage & Model Context](images/kiro_crew_4_session_usage.png)
 
 **Recalled correctly:** on Day 2, when I asked Crew to write the eligibility
 tests, it correctly remembered that the project uses `age = today.year -
