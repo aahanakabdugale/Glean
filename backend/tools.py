@@ -155,9 +155,10 @@ def add_document(doc_type: str, owner: str, expiry_date: str) -> str:
 
 
 @mcp.tool()
-def get_expiring_documents(days: int = 30, member_name: str = "") -> str:
+def get_expiring_documents(days: int = 30, member_name: str = "", doc_type: str = "") -> str:
     """List documents that are already expired or will expire within the next N days (default 30),
     soonest first. Optional member_name filters documents for a specific person.
+    Optional doc_type filters by document type (e.g. 'Passport', 'Insurance').
     Use when the user asks what is expiring or what needs renewing."""
     if not 0 <= days <= 3650:
         return "Please give a number of days between 0 and 3650."
@@ -177,6 +178,9 @@ def get_expiring_documents(days: int = 30, member_name: str = "") -> str:
         if member_name and member_name.strip():
             query += "AND LOWER(m.name) = LOWER(?) "
             params.append(member_name.strip())
+        if doc_type and doc_type.strip():
+            query += "AND LOWER(d.doc_type) LIKE LOWER(?) "
+            params.append(f"%{doc_type.strip()}%")
 
         query += "ORDER BY d.expiry_date"
         rows = conn.execute(query, tuple(params)).fetchall()
@@ -185,8 +189,9 @@ def get_expiring_documents(days: int = 30, member_name: str = "") -> str:
         return "Something went wrong. Please try again."
 
     who = f" for {member_name.strip()}" if member_name and member_name.strip() else ""
+    what = f" matching '{doc_type.strip()}'" if doc_type and doc_type.strip() else ""
     if not rows:
-        return f"Nothing is expiring in the next {days} days{who}."
+        return f"Nothing is expiring in the next {days} days{who}{what}."
 
     lines = []
     for r in rows:
@@ -229,15 +234,21 @@ def add_task(title: str, due_date: str, owner: str = "") -> str:
             member_id = member["id"]
 
         # Check if identical pending task already exists
-        existing = conn.execute(
-            "SELECT id FROM tasks WHERE title = ? AND ((member_id = ?) OR (member_id IS NULL AND ? IS NULL)) AND done = 0",
+        dupes = conn.execute(
+            "SELECT id FROM tasks WHERE LOWER(TRIM(title)) = LOWER(?) AND ((member_id = ?) OR (member_id IS NULL AND ? IS NULL)) AND done = 0",
             (title, member_id, member_id),
-        ).fetchone()
-        if existing:
+        ).fetchall()
+        if dupes:
             conn.execute(
                 "UPDATE tasks SET due_date = ? WHERE id = ?",
-                (due.isoformat(), existing["id"]),
+                (due.isoformat(), dupes[0]["id"]),
             )
+            if len(dupes) > 1:
+                extra_ids = [d["id"] for d in dupes[1:]]
+                conn.execute(
+                    f"DELETE FROM tasks WHERE id IN ({','.join('?' for _ in extra_ids)})",
+                    tuple(extra_ids),
+                )
             conn.commit()
             return f"Task updated: {title}, due {due.isoformat()}."
 
@@ -885,15 +896,21 @@ def orchestrate_life_event(member_name: str, event_type: str, notes: str = "") -
         scheduled_tasks = []
         for task_title, days_offset in phases:
             due_dt = today + datetime.timedelta(days=days_offset)
-            existing = conn.execute(
-                "SELECT id FROM tasks WHERE title = ? AND member_id = ? AND done = 0",
-                (task_title, member["id"]),
-            ).fetchone()
-            if existing:
+            dupes = conn.execute(
+                "SELECT id FROM tasks WHERE LOWER(TRIM(title)) = LOWER(?) AND member_id = ? AND done = 0",
+                (task_title.strip(), member["id"]),
+            ).fetchall()
+            if dupes:
                 conn.execute(
                     "UPDATE tasks SET due_date = ? WHERE id = ?",
-                    (due_dt.isoformat(), existing["id"]),
+                    (due_dt.isoformat(), dupes[0]["id"]),
                 )
+                if len(dupes) > 1:
+                    extra_ids = [d["id"] for d in dupes[1:]]
+                    conn.execute(
+                        f"DELETE FROM tasks WHERE id IN ({','.join('?' for _ in extra_ids)})",
+                        tuple(extra_ids),
+                    )
             else:
                 conn.execute(
                     "INSERT INTO tasks (title, due_date, member_id) VALUES (?, ?, ?)",
@@ -1519,6 +1536,7 @@ def trigger_proactive_ambient_alert(member_name: str = "", custom_message: str =
                 "member": name_clean or "Household",
                 "speech": msg_clean,
                 "prompt": msg_clean,
+                "suggested_action": msg_clean,
                 "action_label": "Review Notice",
                 "timestamp": datetime.datetime.now().isoformat(),
             }
@@ -1972,6 +1990,236 @@ def get_family_dashboard() -> str:
     except Exception as exc:
         logger.error("get_family_dashboard failed: %s", exc)
         return "Something went wrong loading the dashboard. Please try again."
+
+
+@mcp.tool()
+def get_document_tracker(member_name: str = "") -> str:
+    """Document Tracker: audits all paperwork and deadlines, classifying items into:
+    - completed: valid documents with >30 days left, or completed tasks.
+    - partial: documents expiring in <=30 days, or upcoming tasks.
+    - remaining: expired documents (<0 days left), overdue tasks, or urgent tasks due in <=7 days.
+    Provides simple audio speech ('{completed} completed, {partial} partial, and {remaining} remaining')
+    and structured items for interactive UI filtering."""
+    name_clean = member_name.strip()
+    if name_clean:
+        try:
+            sanitize_input(name_clean)
+        except ValueError as val_err:
+            return str(val_err)
+
+    try:
+        conn = db.get_connection()
+        db.align_demo_dates(conn)
+        today = datetime.date.today()
+
+        member_id = None
+        target_name = ""
+        if name_clean and name_clean.lower() not in ("all", "family", "everyone", "household"):
+            row = conn.execute(
+                "SELECT id, name FROM family_members WHERE LOWER(name) = LOWER(?)",
+                (name_clean,)
+            ).fetchone()
+            if not row:
+                return f"I don't have records for '{name_clean}'. Add them first."
+            member_id = row["id"]
+            target_name = row["name"]
+
+        # Fetch documents
+        if member_id:
+            docs = conn.execute(
+                "SELECT d.id, d.doc_type, d.expiry_date, m.name as owner_name "
+                "FROM documents d JOIN family_members m ON m.id = d.member_id "
+                "WHERE d.member_id = ? ORDER BY d.expiry_date ASC",
+                (member_id,)
+            ).fetchall()
+        else:
+            docs = conn.execute(
+                "SELECT d.id, d.doc_type, d.expiry_date, m.name as owner_name "
+                "FROM documents d JOIN family_members m ON m.id = d.member_id "
+                "ORDER BY d.expiry_date ASC"
+            ).fetchall()
+
+        # Fetch tasks
+        if member_id:
+            tasks = conn.execute(
+                "SELECT t.id, t.title, t.due_date, t.done, m.name as owner_name "
+                "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+                "WHERE t.member_id = ? OR t.member_id IS NULL "
+                "ORDER BY t.due_date ASC",
+                (member_id,)
+            ).fetchall()
+        else:
+            tasks = conn.execute(
+                "SELECT t.id, t.title, t.due_date, t.done, m.name as owner_name "
+                "FROM tasks t LEFT JOIN family_members m ON m.id = t.member_id "
+                "ORDER BY t.due_date ASC"
+            ).fetchall()
+
+        # Deduplicate tasks by (title, owner_name, done) keeping the soonest due date
+        seen_tasks = set()
+        unique_tasks = []
+        for t in tasks:
+            task_key = (
+                t["title"].strip().lower(),
+                (t["owner_name"] or "").strip().lower(),
+                t["done"],
+            )
+            if task_key not in seen_tasks:
+                seen_tasks.add(task_key)
+                unique_tasks.append(t)
+        tasks = unique_tasks
+
+        # Deduplicate documents by (doc_type, owner_name)
+        seen_docs = set()
+        unique_docs = []
+        for d in docs:
+            doc_key = (
+                d["doc_type"].strip().lower(),
+                (d["owner_name"] or "").strip().lower(),
+            )
+            if doc_key not in seen_docs:
+                seen_docs.add(doc_key)
+                unique_docs.append(d)
+        docs = unique_docs
+
+        completed_items = []
+        partial_items = []
+        remaining_items = []
+
+        for d in docs:
+            exp = datetime.date.fromisoformat(d["expiry_date"])
+            days_left = (exp - today).days
+            owner = d["owner_name"]
+            doc_type = d["doc_type"]
+
+            if days_left < 0:
+                remaining_items.append({
+                    "id": f"doc-{d['id']}",
+                    "category": "document",
+                    "title": doc_type,
+                    "member": owner,
+                    "status": "remaining",
+                    "statusLabel": f"Expired {-days_left}d ago",
+                    "date": d["expiry_date"],
+                    "days": days_left,
+                    "actionPrompt": f"Check expiring {doc_type} for {owner}"
+                })
+            elif days_left <= 30:
+                partial_items.append({
+                    "id": f"doc-{d['id']}",
+                    "category": "document",
+                    "title": doc_type,
+                    "member": owner,
+                    "status": "partial",
+                    "statusLabel": f"Expires in {days_left}d",
+                    "date": d["expiry_date"],
+                    "days": days_left,
+                    "actionPrompt": f"Check expiring {doc_type} for {owner}"
+                })
+            else:
+                completed_items.append({
+                    "id": f"doc-{d['id']}",
+                    "category": "document",
+                    "title": doc_type,
+                    "member": owner,
+                    "status": "completed",
+                    "statusLabel": f"Valid ({days_left}d left)",
+                    "date": d["expiry_date"],
+                    "days": days_left,
+                    "actionPrompt": f"Check expiring {doc_type} for {owner}"
+                })
+
+        for t in tasks:
+            owner = t["owner_name"] or "Household"
+            title = t["title"]
+
+            if t["done"] == 1:
+                completed_items.append({
+                    "id": f"task-{t['id']}",
+                    "category": "task",
+                    "title": title,
+                    "member": owner,
+                    "status": "completed",
+                    "statusLabel": "Completed",
+                    "date": t["due_date"],
+                    "days": 0,
+                    "actionPrompt": ""
+                })
+            else:
+                due = datetime.date.fromisoformat(t["due_date"])
+                days_left = (due - today).days
+                if days_left < 0:
+                    remaining_items.append({
+                        "id": f"task-{t['id']}",
+                        "category": "task",
+                        "title": title,
+                        "member": owner,
+                        "status": "remaining",
+                        "statusLabel": f"Overdue by {-days_left}d",
+                        "date": t["due_date"],
+                        "days": days_left,
+                        "actionPrompt": f"I have completed {title} for {owner}"
+                    })
+                elif days_left <= 7:
+                    remaining_items.append({
+                        "id": f"task-{t['id']}",
+                        "category": "task",
+                        "title": title,
+                        "member": owner,
+                        "status": "remaining",
+                        "statusLabel": f"Due in {days_left}d",
+                        "date": t["due_date"],
+                        "days": days_left,
+                        "actionPrompt": f"I have completed {title} for {owner}"
+                    })
+                else:
+                    partial_items.append({
+                        "id": f"task-{t['id']}",
+                        "category": "task",
+                        "title": title,
+                        "member": owner,
+                        "status": "partial",
+                        "statusLabel": f"Upcoming ({days_left}d left)",
+                        "date": t["due_date"],
+                        "days": days_left,
+                        "actionPrompt": f"What tasks are coming up for {owner}?"
+                    })
+
+        c_count = len(completed_items)
+        p_count = len(partial_items)
+        r_count = len(remaining_items)
+        total = c_count + p_count + r_count
+
+        prefix = f"For {target_name}: " if target_name else "Paperwork status: "
+        spoken = f"{prefix}{c_count} completed, {p_count} partial, and {r_count} remaining."
+
+        lines = [
+            f"=== DOCUMENT & TASK TRACKER ===",
+            f"Target: {target_name or 'All Family Members'}",
+            f"Summary: {c_count} completed, {p_count} partial, {r_count} remaining ({total} total)",
+            f"Spoken Brief: {spoken}",
+            "",
+            f"--- COMPLETED ({c_count}) ---"
+        ]
+        for it in completed_items:
+            cat = "Doc" if it["category"] == "document" else "Task"
+            lines.append(f"- [COMPLETED] [{it['member']}] ({cat}) {it['title']} - {it['statusLabel']}")
+
+        lines.append(f"\n--- PARTIAL ({p_count}) ---")
+        for it in partial_items:
+            cat = "Doc" if it["category"] == "document" else "Task"
+            lines.append(f"- [PARTIAL] [{it['member']}] ({cat}) {it['title']} - {it['statusLabel']}")
+
+        lines.append(f"\n--- REMAINING ({r_count}) ---")
+        for it in remaining_items:
+            cat = "Doc" if it["category"] == "document" else "Task"
+            lines.append(f"- [REMAINING] [{it['member']}] ({cat}) {it['title']} - {it['statusLabel']}")
+
+        lines.append("\nGuidance only, verify on official portals.")
+        return "\n".join(lines)
+    except Exception as exc:
+        logger.error("get_document_tracker failed: %s", exc)
+        return "Something went wrong generating the document tracker. Please try again."
 
 
 # Ensure spec-depth MCP resources and prompts are registered with mcp server

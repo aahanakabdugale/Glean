@@ -59,6 +59,20 @@ def align_demo_dates(conn=None):
     if member_count < 6 or doc_count < 10:
         return
 
+    # Automatically purge redundant duplicate tasks keeping only the earliest row per unique task
+    try:
+        cur.execute("""
+            DELETE FROM tasks
+            WHERE id NOT IN (
+                SELECT MIN(id)
+                FROM tasks
+                GROUP BY LOWER(TRIM(title)), COALESCE(member_id, 0), done
+            )
+        """)
+        conn.commit()
+    except Exception:
+        pass
+
     # Check if Chandler's passport exists in this database
     row = cur.execute(
         "SELECT d.id, d.expiry_date FROM documents d "

@@ -51,6 +51,7 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
                     "date": d["expiry_date"],
                     "speech": f"Attention: {d['owner_name']}'s {d['doc_type']} expired {-days_left} days ago. This blocks official scheme applications.",
                     "prompt": f"Audit document dependencies and blockers for {d['owner_name']}",
+                    "suggested_action": f"Audit document dependencies and blockers for {d['owner_name']}",
                     "action_label": "Audit Blockers",
                     "timestamp": datetime.datetime.now().isoformat(),
                 })
@@ -65,7 +66,8 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
                     "days": days_left,
                     "date": d["expiry_date"],
                     "speech": f"Heads up: {d['owner_name']}'s {d['doc_type']} expires in {days_left} days. Immediate renewal is recommended to avoid travel or benefit lockouts.",
-                    "prompt": f"What documents are expiring soon?",
+                    "prompt": f"Check expiring {d['doc_type']} for {d['owner_name']}",
+                    "suggested_action": f"Check expiring {d['doc_type']} for {d['owner_name']}",
                     "action_label": "Renew Now",
                     "timestamp": datetime.datetime.now().isoformat(),
                 })
@@ -80,7 +82,8 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
                     "days": days_left,
                     "date": d["expiry_date"],
                     "speech": f"Reminder: {d['owner_name']}'s {d['doc_type']} expires on {d['expiry_date']}.",
-                    "prompt": f"What documents are expiring soon?",
+                    "prompt": f"Check expiring {d['doc_type']} for {d['owner_name']}",
+                    "suggested_action": f"Check expiring {d['doc_type']} for {d['owner_name']}",
                     "action_label": "View Expiries",
                     "timestamp": datetime.datetime.now().isoformat(),
                 })
@@ -107,7 +110,8 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
                     "days": days_left,
                     "date": t["due_date"],
                     "speech": f"Notice: The task '{t['title']}' is overdue by {-days_left} days.",
-                    "prompt": "What tasks are coming up in the next 30 days?",
+                    "prompt": f"What tasks are coming up for {t['owner_name']}?" if t["owner_name"] else "What tasks are coming up in the next 30 days?",
+                    "suggested_action": f"What tasks are coming up for {t['owner_name']}?" if t["owner_name"] else "What tasks are coming up in the next 30 days?",
                     "action_label": "View Tasks",
                     "timestamp": datetime.datetime.now().isoformat(),
                 })
@@ -122,7 +126,8 @@ def evaluate_proactive_alerts(conn=None) -> list[dict]:
                     "days": 0,
                     "date": t["due_date"],
                     "speech": f"Reminder: The task '{t['title']}' is due today.",
-                    "prompt": "What tasks are coming up in the next 30 days?",
+                    "prompt": f"What tasks are coming up for {t['owner_name']}?" if t["owner_name"] else "What tasks are coming up in the next 30 days?",
+                    "suggested_action": f"What tasks are coming up for {t['owner_name']}?" if t["owner_name"] else "What tasks are coming up in the next 30 days?",
                     "action_label": "View Tasks",
                     "timestamp": datetime.datetime.now().isoformat(),
                 })
