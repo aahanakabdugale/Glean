@@ -16,6 +16,7 @@ import backend.db as glean_db
 from backend.tools import (
     add_document,
     add_family_member,
+    get_document_tracker,
     get_expiring_documents,
     list_family_members,
 )
@@ -840,5 +841,29 @@ def test_complete_task_not_found_with_candidates(db_conn):
     add_task("Pick up medicine", due)
     res = complete_task(task_title="Nonexistent errand 12345")
     assert "Couldn't find any pending task" in res
+
+
+def test_get_document_tracker_counts_and_spoken(db_conn):
+    """Test get_document_tracker categorizes into completed, partial, and remaining with simple spoken summary."""
+    add_family_member("Chandler", "grandfather", 1950, "retired")
+    today = _dt.date.today()
+    add_document("Passport", "Chandler", (today + _dt.timedelta(days=6)).isoformat())  # partial
+    add_document("Fixed Deposit", "Chandler", (today + _dt.timedelta(days=120)).isoformat())  # completed
+    add_document("Old ID", "Chandler", (today - _dt.timedelta(days=5)).isoformat())  # remaining (expired)
+
+    res = get_document_tracker("Chandler")
+    assert "DOCUMENT & TASK TRACKER" in res
+    assert "Target: Chandler" in res
+    assert "For Chandler: 1 completed, 1 partial, and 1 remaining." in res
+    assert "[COMPLETED] [Chandler] (Doc) Fixed Deposit" in res
+    assert "[PARTIAL] [Chandler] (Doc) Passport" in res
+    assert "[REMAINING] [Chandler] (Doc) Old ID" in res
+
+
+def test_get_document_tracker_empty_member(db_conn):
+    """Calling get_document_tracker on unknown member returns friendly prompt."""
+    res = get_document_tracker("NonexistentPerson")
+    assert "I don't have records for 'NonexistentPerson'" in res
+
 
 
