@@ -4,7 +4,7 @@
 
 Project submitted to: **Build, Ship, Shape: Amazon Developer Hackathon**  
 Track: **Alexa+**  
-Live Deployment: Try Glean at [https://glean-alexa.onrender.com/](https://glean-alexa.onrender.com/)
+ Try Glean : [https://glean-alexa.onrender.com/](https://glean-alexa.onrender.com/)
 
 ---
 
@@ -43,7 +43,7 @@ Glean provides an autonomous, multi-generational paperwork sentinel engineered f
 
 Glean is built on the Model Context Protocol (MCP) using the official Python SDK over Streamable HTTP. Alexa+ acts as the primary cognitive reasoning agent, querying Glean's 17 administrative tools, 4 resources, and 3 prompt templates over HTTP/SSE.
 
-![Glean System Architecture](docs/architecture_diagram.png)
+
 
 ### High-Level Architecture Flow
 
