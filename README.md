@@ -1,6 +1,5 @@
 # Glean on Alexa+ | Family Paperwork Assistant
 
-> Autonomous multi-generational family paperwork manager, deadline sentinel, and government scheme eligibility routing engine.
 
 Project submitted to: **Build, Ship, Shape: Amazon Developer Hackathon**  
 Track: **Alexa+**  
