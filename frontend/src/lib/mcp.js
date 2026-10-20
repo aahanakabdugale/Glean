@@ -24,16 +24,30 @@ import {
 
 let sessionId = null;
 
+export function resolveServerUrl(rawUrl) {
+  let url = (rawUrl || '').trim();
+  if (typeof window !== 'undefined' && window.location.origin) {
+    const isRemote = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+    if (isRemote && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+      return `${window.location.origin}/mcp`;
+    }
+    if (url.includes('localhost:8000') && window.location.origin.includes('127.0.0.1')) {
+      return `${window.location.origin}/mcp`;
+    }
+    if (url.includes('127.0.0.1:8000') && window.location.origin.includes('localhost')) {
+      return `${window.location.origin}/mcp`;
+    }
+    if (url.startsWith('/')) {
+      return `${window.location.origin}${url}`;
+    }
+  }
+  return url || 'http://localhost:8000/mcp';
+}
+
 async function ensureSession() {
   if (sessionId) return sessionId;
   let { serverUrl, serverToken } = get(settings);
-  if (typeof window !== 'undefined' && window.location.origin) {
-    if (serverUrl.includes('localhost:8000') && window.location.origin.includes('127.0.0.1')) {
-      serverUrl = `${window.location.origin}/mcp`;
-    } else if (serverUrl.includes('127.0.0.1:8000') && window.location.origin.includes('localhost')) {
-      serverUrl = `${window.location.origin}/mcp`;
-    }
-  }
+  serverUrl = resolveServerUrl(serverUrl);
   const headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json, text/event-stream',
@@ -71,13 +85,7 @@ async function ensureSession() {
 
 async function callTool(toolName, toolArgs = {}) {
   let { serverUrl, serverToken } = get(settings);
-  if (typeof window !== 'undefined' && window.location.origin) {
-    if (serverUrl.includes('localhost:8000') && window.location.origin.includes('127.0.0.1')) {
-      serverUrl = `${window.location.origin}/mcp`;
-    } else if (serverUrl.includes('127.0.0.1:8000') && window.location.origin.includes('localhost')) {
-      serverUrl = `${window.location.origin}/mcp`;
-    }
-  }
+  serverUrl = resolveServerUrl(serverUrl);
   const start = performance.now();
   let payload = null;
   let sid = null;

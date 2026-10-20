@@ -36,17 +36,40 @@ export function toggleTheme() {
 // Persisted to localStorage so they survive page refresh.
 const SETTINGS_KEY = 'glean-settings';
 
+function getDefaultServerUrl() {
+  if (typeof window !== 'undefined' && window.location.origin) {
+    // If running in Vite dev server (port 5173), target the backend at port 8000
+    if (window.location.port === '5173') {
+      return `${window.location.protocol}//${window.location.hostname}:8000/mcp`;
+    }
+    // If running on any deployed host (e.g. *.onrender.com) or directly served by the backend
+    return `${window.location.origin}/mcp`;
+  }
+  return 'http://localhost:8000/mcp';
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...defaultSettings(), ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      // Auto-heal: If visiting on a remote origin (like Render) and stored serverUrl still points to localhost,
+      // update it automatically to current origin so users aren't stuck disconnected.
+      if (typeof window !== 'undefined' && window.location.origin) {
+        const isRemote = !window.location.hostname.includes('localhost') && !window.location.hostname.includes('127.0.0.1');
+        if (isRemote && parsed.serverUrl && (parsed.serverUrl.includes('localhost') || parsed.serverUrl.includes('127.0.0.1'))) {
+          parsed.serverUrl = `${window.location.origin}/mcp`;
+        }
+      }
+      return { ...defaultSettings(), ...parsed };
+    }
   } catch {}
   return defaultSettings();
 }
 
 function defaultSettings() {
   return {
-    serverUrl: 'http://localhost:8000/mcp',
+    serverUrl: getDefaultServerUrl(),
     serverToken: '',
     voiceEnabled: true,
     showToolCalls: true,
