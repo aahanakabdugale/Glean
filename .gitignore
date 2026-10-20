@@ -8,3 +8,5 @@ __pycache__/
 2. PRD_ Main Project (Alexa+ Family Admin Agent).md
 3. PRD_ AWS Builder Mini Challenge.md
 4. PRD_ Open Source Mini Challenge.md
+docs/architecture_diagram*
+generate_diagram.py
