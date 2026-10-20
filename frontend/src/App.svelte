@@ -151,10 +151,25 @@
         result = await mcp.callTriggerProactiveAmbientAlert(person);
         result.toolName = 'trigger_proactive_ambient_alert';
         result.toolArgs = person ? { member_name: person } : {};
-      } else if (q.includes('dialect') || q.includes('generation') || q.includes('explain for') || q.includes('grandparent') || q.includes('student') || q.includes('young adult') || q.includes('persona') || q.includes('sovereign savings') || q.includes('subsidy')) {
+      } else if (
+        q.includes('dialect') ||
+        q.includes('generation') ||
+        (q.includes('explain') && (q.includes('for') || q.includes('dialect') || q.includes('persona'))) ||
+        q.includes('grandparent') ||
+        q.includes('grandmother') ||
+        q.includes('grandfather') ||
+        q.includes('grandma') ||
+        q.includes('grandpa') ||
+        q.includes('student') ||
+        q.includes('young adult') ||
+        q.includes('persona') ||
+        q.includes('sovereign savings') ||
+        q.includes('subsidy')
+      ) {
         let persona = 'grandparent';
         if (q.includes('student') || q.includes('young') || q.includes('teen') || q.includes('college') || q.includes('jace') || q.includes('gwen')) persona = 'young_adult';
         else if (q.includes('parent') || q.includes('adult') || q.includes('working') || q.includes('tax') || q.includes('riley') || q.includes('justin')) persona = 'parent';
+        else if (q.includes('grand') || q.includes('elder') || q.includes('senior') || q.includes('amy') || q.includes('chandler')) persona = 'grandparent';
         const scheme = extractScheme(q) || 'scss';
         result = await mcp.callExplainForGeneration(scheme, persona);
         result.toolName = 'explain_for_generation';
@@ -330,7 +345,7 @@
     if (q.includes('social security') || q.includes('oasi') || q.includes('ssa')) return 'us_social_security';
     if (q.includes('snap') || q.includes('food stamp') || q.includes('ebt')) return 'us_snap';
     if (q.includes('401k') || q.includes('catch-up') || q.includes('catch up') || q.includes('secure 2.0')) return 'us_catchup_401k';
-    if (q.includes('ayushman')) return 'ayushman_vay_vandana';
+    if (q.includes('ayushman') || q.includes('vaya') || q.includes('vandana')) return 'ayushman_vay_vandana';
     if (q.includes('scss') || q.includes('saving')) return 'scss';
     if (q.includes('apy') || q.includes('atal')) return 'apy';
     if (q.includes('ignoaps') || q.includes('old age')) return 'ignoaps_mh';
