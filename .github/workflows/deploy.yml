@@ -51,11 +51,11 @@ jobs:
     steps:
       - name: Trigger Render Webhook
         env:
-          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.GLEAN_DEPLOY_HOOK_URL || secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
           if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
-            echo "::warning ::RENDER_DEPLOY_HOOK_URL secret is not set yet. Skipping automatic deploy trigger."
-            echo "To enable automatic deploy, add RENDER_DEPLOY_HOOK_URL to your GitHub repository secrets."
+            echo "::warning ::Neither GLEAN_DEPLOY_HOOK_URL nor RENDER_DEPLOY_HOOK_URL secret is set. Skipping automatic deploy trigger."
+            echo "To enable automatic deploy, add GLEAN_DEPLOY_HOOK_URL to your GitHub repository secrets."
             exit 0
           fi
 
