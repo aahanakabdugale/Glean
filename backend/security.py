@@ -113,6 +113,10 @@ DEFAULT_ALLOWED_ORIGINS: list[str] = [
     "http://127.0.0.1:*",
     "https://localhost:*",
     "https://127.0.0.1:*",
+    "https://*.onrender.com",
+    "https://*.onrender.com:*",
+    "http://*.onrender.com",
+    "http://*.onrender.com:*",
 ]
 
 

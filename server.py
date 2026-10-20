@@ -24,7 +24,9 @@ import logging
 import os
 
 import uvicorn
+from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
 from starlette.responses import HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.staticfiles import StaticFiles
@@ -92,7 +94,12 @@ class GleanSecurityMiddleware(BaseHTTPMiddleware):
 
         # --- Origin check ---------------------------------------------------
         origin = request.headers.get("origin")
-        origin_ok, origin_err = validate_origin(origin)
+        proto = request.headers.get("x-forwarded-proto", request.url.scheme)
+        base_origin = f"{proto}://{request.url.netloc}"
+        if origin and origin.rstrip("/") == base_origin.rstrip("/"):
+            origin_ok, origin_err = True, None
+        else:
+            origin_ok, origin_err = validate_origin(origin)
         if not origin_ok:
             logger.warning("Blocked request — bad origin: %s", origin)
             return JSONResponse(
@@ -123,12 +130,27 @@ class GleanSecurityMiddleware(BaseHTTPMiddleware):
 
 def build_app():
     """Return the MCP Starlette ASGI app with security middleware applied."""
-    host = os.environ.get("GLEAN_HOST", "127.0.0.1")
-    app = mcp.streamable_http_app(host=host)
+    host = os.environ.get("GLEAN_HOST", "0.0.0.0")
+
+    # Disable library-level DNS rebinding check that locks Host to 127.0.0.1.
+    # GleanSecurityMiddleware and CORSMiddleware handle origins safely,
+    # and deployed reverse-proxies (Render, Cloudflare, etc.) send custom Host headers.
+    security_settings = TransportSecuritySettings(
+        enable_dns_rebinding_protection=False
+    )
+    app = mcp.streamable_http_app(host=host, transport_security=security_settings)
 
     # Wrap it: middleware is applied outermost-first so security runs before
     # any MCP processing.
     app.add_middleware(GleanSecurityMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+        expose_headers=["mcp-session-id"],
+    )
 
     # --- Proactive Ambient Push & SSE endpoints -------------------------
     async def ambient_events_endpoint(request: Request):
