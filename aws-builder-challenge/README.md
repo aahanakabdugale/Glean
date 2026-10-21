@@ -89,9 +89,9 @@ the prompt before the test session.
 - **PATH not set after install:** `kirocrew` was not on PATH after the desktop
   installer ran. Had to find `kirocrew.cmd` manually under
   `%LOCALAPPDATA%\Programs\KiroCrew\...\bin` and run it with the full path.
-  ~10 min lost. (Friction log entry 9.)
+  ~10 min lost. (Friction log entry 19.)
 - **`kiro-cli` also not on PATH until terminal restart:** same issue — the
-  terminal opened before the installer updated PATH. (Friction log entry 8.)
+  terminal opened before the installer updated PATH. (Friction log entry 18.)
 - **Credit usage is opaque:** there is no in-app indicator of how many of the
   50 free monthly credits have been used. I had to be conservative and avoid
   running large sessions unnecessarily.
@@ -113,7 +113,7 @@ GitHub account, opening the dashboard, starting a chat.
 
 Blockers: `kiro-cli` not on PATH until a new terminal was opened (10 min),
 `kirocrew` not on PATH at all (10 min, had to use full path). Both are captured in
-`docs/friction-log.md` entries 8 and 9.
+`docs/friction-log.md` entries 18 and 19.
 
 ---
 

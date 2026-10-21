@@ -167,7 +167,7 @@ Family administrative data requires strict confidentiality and privacy guarantee
 
 ## AWS Builder Challenge Integration
 
-Glean actively leveraged **Kiro Crew** (AWS's open-source agent workspace) and **Kiro CLI** during development to establish a spec-driven, multi-agent development workflow. Comprehensive documentation and session logs are available in [`docs/aws-builder.md`](docs/aws-builder.md).
+Glean actively leveraged **Kiro Crew** (AWS's open-source agent workspace) and **Kiro CLI** during development to establish a spec-driven, multi-agent development workflow. Comprehensive documentation and session logs are available in [`aws-builder-challenge/README.md`](aws-builder-challenge/README.md) and [`docs/aws-builder.md`](docs/aws-builder.md).
 
 ### 1. Spec-Driven Development
 Before writing implementation code, structured specifications were authored and reviewed:

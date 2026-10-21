@@ -154,3 +154,21 @@ Honest, technically precise engineering logs detailing architectural obstacles, 
 - **Root cause:** FastMCP returns the active session identifier inside a custom HTTP response header `mcp-session-id`. Under browser Cross-Origin Resource Sharing (CORS) rules, custom response headers are masked from the Fetch API (`response.headers.get('mcp-session-id')`) unless explicitly allowed via the `Access-Control-Expose-Headers` preflight header. In addition, development environments swapping between `localhost` and `127.0.0.1` failed strict string origin matching.
 - **Fix:** Configured Starlette CORS middleware to explicitly emit `Access-Control-Expose-Headers: mcp-session-id, Content-Type`, and implemented origin canonicalization in [`backend/security.py`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/backend/security.py) and [`frontend/src/lib/mcp.js`](file:///c:/Users/ADMIN/Desktop/PROJECT/Glean/frontend/src/lib/mcp.js) to transparently reconcile `localhost` with `127.0.0.1`.
 - **Impact & Time lost:** ~25 min.
+
+---
+
+### 18. Kiro CLI PATH Variable Not Propagated to Active Terminal Sessions
+- **Component:** AWS Kiro CLI v2.27.1 / Environment Configuration
+- **What happened:** Running `kiro-cli` immediately following installer completion failed with `The term 'kiro-cli' is not recognized as the name of a cmdlet, function, script file, or operable program`.
+- **Root cause:** The Windows installer appended the binary directory to system environment variables, but existing active terminal shells did not inherit updated environment blocks without a full process reload.
+- **Fix:** Restarted the PowerShell development session to reload the system `PATH` registry block, verifying CLI availability with `kiro --version`.
+- **Impact & Time lost:** ~10 min.
+
+---
+
+### 19. Kiro Crew Desktop Executable Missing from Default System PATH
+- **Component:** AWS Kiro Crew Desktop / Windows Installer
+- **What happened:** Attempting to trigger `kirocrew` from terminal workflows resulted in command resolution failure even after terminal restart.
+- **Root cause:** The Kiro Crew desktop setup package placed executable binaries inside `%LOCALAPPDATA%\Programs\KiroCrew\...\bin` without registering an entry in user or machine `PATH` variables.
+- **Fix:** Located `kirocrew.cmd` directly in the local application directory and invoked execution using its qualified path, subsequently appending the directory to user user-level environment paths.
+- **Impact & Time lost:** ~10 min.
